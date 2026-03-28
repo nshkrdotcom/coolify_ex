@@ -5,17 +5,17 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nshkrdotcom/coolify_ex"><img src="https://img.shields.io/badge/release-0.1.0-0f766e.svg" alt="Release 0.1.0" /></a>
+  <a href="https://github.com/nshkrdotcom/coolify_ex"><img src="https://img.shields.io/badge/release-0.2.0-0f766e.svg" alt="Release 0.2.0" /></a>
   <a href="https://hexdocs.pm/coolify_ex/"><img src="https://img.shields.io/badge/docs-hexdocs-2563eb.svg" alt="HexDocs" /></a>
   <a href="https://github.com/nshkrdotcom/coolify_ex"><img src="https://img.shields.io/badge/license-MIT-111827.svg" alt="MIT License" /></a>
   <a href="https://github.com/nshkrdotcom/coolify_ex"><img src="https://img.shields.io/badge/github-nshkrdotcom%2Fcoolify__ex-24292f?style=flat&logo=github" alt="GitHub" /></a>
 </p>
 
-`CoolifyEx` is an Elixir library and set of Mix tasks for triggering an existing Coolify application, waiting for the deployment to reach a terminal state, and then running smoke checks against the live app. It does not create applications in Coolify, replace your Dockerfile or build strategy, or act as a CI/CD system; the main use case is an operator-driven deploy from a trusted workstation or remote server that already has Git, Mix, and the right credentials.
+`CoolifyEx` is an Elixir library and set of Mix tasks for triggering an existing Coolify application, waiting for the deployment to reach a terminal state, inspecting both deployment logs and runtime application logs, and then running smoke checks against the live app. It does not create applications in Coolify, replace your Dockerfile or build strategy, or act as a CI/CD system; the main use case is an operator-driven deploy from a trusted workstation or remote server that already has Git, Mix, and the right credentials.
 
 ## How It Fits in Your Stack
 
-Your Git repository stays the source of truth. A local manifest tells `CoolifyEx` which Coolify application UUID to deploy, which branch must be current, which smoke checks to run, and which values to resolve from the environment. `CoolifyEx` can then push Git, call the Coolify API, poll deployment status, and finally verify the live URL that Coolify is serving.
+Your Git repository stays the source of truth. A local manifest tells `CoolifyEx` which Coolify application UUID to deploy, which branch must be current, which smoke checks to run, and which values to resolve from the environment. `CoolifyEx` can then push Git, call the Coolify API, poll deployment status, inspect runtime logs for the same app, and finally verify the live URL that Coolify is serving.
 
 ```text
 Git repo on trusted host
@@ -32,6 +32,10 @@ Coolify deployment
   | poll deployment UUID until success or failure
   v
 Running application
+  |
+  | fetch runtime logs by manifest project
+  v
+Runtime log inspection
   |
   | GET/HEAD smoke checks
   v
@@ -57,7 +61,7 @@ Add `coolify_ex` to your dependencies:
 ```elixir
 def deps do
   [
-    {:coolify_ex, "~> 0.1.0", runtime: false}
+    {:coolify_ex, "~> 0.2.0", runtime: false}
   ]
 end
 ```
@@ -103,7 +107,7 @@ You need one UUID per manifest project entry.
 ```elixir
 def deps do
   [
-    {:coolify_ex, "~> 0.1.0", runtime: false}
+    {:coolify_ex, "~> 0.2.0", runtime: false}
   ]
 end
 ```
@@ -158,6 +162,14 @@ mix coolify.deploy
 
 On success, the task prints `Deployment finished: DEPLOYMENT_UUID` and then `Verification passed: PASSED/TOTAL checks` unless you used `--skip-verify`.
 
+10. Inspect runtime logs for the deployed app.
+
+```bash
+mix coolify.app_logs --project web --lines 200
+```
+
+This fetches the current runtime log tail from Coolify's application logs API by resolving the manifest project entry to its `app_uuid`.
+
 ## Example Manifest
 
 ```elixir
@@ -203,12 +215,14 @@ This is the shipped `coolify.example.exs` with inline comments describing how ea
 | `mix coolify.deploy` | Optionally pushes Git, starts a Coolify deployment, waits for completion, and optionally verifies smoke checks. | `mix coolify.deploy --project web --force` |
 | `mix coolify.status` | Fetches one deployment by UUID and prints its status plus the Coolify logs URL when available. | `mix coolify.status DEPLOYMENT_UUID` |
 | `mix coolify.logs` | Fetches one deployment by UUID and prints normalized log lines. | `mix coolify.logs DEPLOYMENT_UUID --tail 50` |
+| `mix coolify.app_logs` | Fetches runtime logs for one manifest project and can poll for new lines. | `mix coolify.app_logs --project web --lines 200 --follow` |
 | `mix coolify.verify` | Runs the manifest's smoke checks without starting a new deployment. | `mix coolify.verify --project web` |
 
 ## Key Behaviors
 
 - Relative smoke-check URLs are expanded only when the URL starts with `/` and `public_base_url` is a string. Otherwise the URL is kept exactly as written.
 - `mix coolify.deploy --no-push` skips the Git push step but still loads the manifest, starts the deployment, waits for Coolify, and verifies unless you also pass `--skip-verify`.
+- `mix coolify.app_logs` resolves a manifest project to its `app_uuid` and calls Coolify's application-logs endpoint; `--follow` re-polls that endpoint and prints only newly observed lines.
 - `project_path` must point to an existing directory when the manifest loads, but Git pushes always happen from `repo_root`, which is the directory that contains the manifest.
 - If the Coolify deployment succeeds and a smoke check fails afterward, `mix coolify.deploy` raises `Verification failed with N failing checks`; it does not roll back or mark the deployment itself as failed in Coolify.
 - Manifest loading is eager. If any `{:env, "NAME"}` tuple resolves to `nil` for a required field, the whole load fails before any task-specific work begins.

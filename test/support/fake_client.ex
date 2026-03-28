@@ -11,6 +11,10 @@ defmodule CoolifyEx.TestSupport.FakeClient do
     Process.put({__MODULE__, :fetch_responses}, responses)
   end
 
+  def set_fetch_application_log_responses(responses) do
+    Process.put({__MODULE__, :fetch_application_log_responses}, responses)
+  end
+
   @impl true
   def start_deployment(_base_url, _token, _app_uuid, _opts) do
     Process.get({__MODULE__, :start_response}, {:error, :missing_start_response})
@@ -25,6 +29,18 @@ defmodule CoolifyEx.TestSupport.FakeClient do
 
       [] ->
         {:error, :missing_fetch_response}
+    end
+  end
+
+  @impl true
+  def fetch_application_logs(_base_url, _token, _app_uuid, _opts) do
+    case Process.get({__MODULE__, :fetch_application_log_responses}, []) do
+      [response | rest] ->
+        Process.put({__MODULE__, :fetch_application_log_responses}, rest)
+        response
+
+      [] ->
+        {:error, :missing_fetch_application_log_response}
     end
   end
 end

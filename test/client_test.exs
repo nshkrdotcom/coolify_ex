@@ -1,6 +1,7 @@
 defmodule CoolifyEx.ClientTest do
   use ExUnit.Case, async: true
 
+  alias CoolifyEx.ApplicationLogs
   alias CoolifyEx.Client
 
   setup do
@@ -45,5 +46,20 @@ defmodule CoolifyEx.ClientTest do
     assert deployment.commit == "abc123"
     assert deployment.deployment_url == "/project/demo/deployment/dep-123"
     assert Enum.map(deployment.logs, & &1.output) == ["done"]
+  end
+
+  test "fetches application logs and splits runtime lines", %{base_url: base_url, bypass: bypass} do
+    Bypass.expect_once(bypass, "GET", "/api/v1/applications/app-123/logs", fn conn ->
+      assert ["Bearer token-123"] = Plug.Conn.get_req_header(conn, "authorization")
+      assert conn.query_string == "lines=250"
+      Plug.Conn.resp(conn, 200, ~s({"logs":"booted\\nhandled request\\n"}))
+    end)
+
+    assert {:ok, %ApplicationLogs{} = application_logs} =
+             Client.fetch_application_logs(base_url, "token-123", "app-123", lines: 250)
+
+    assert application_logs.app_uuid == "app-123"
+    assert application_logs.raw == "booted\nhandled request\n"
+    assert Enum.map(application_logs.logs, & &1.output) == ["booted", "handled request"]
   end
 end

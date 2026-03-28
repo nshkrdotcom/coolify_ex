@@ -8,7 +8,7 @@ defmodule CoolifyEx.Verifier do
   alias CoolifyEx.Verifier.Result
 
   @spec verify(Config.t(), String.t() | atom(), keyword()) ::
-          {:ok, Result.t()} | {:error, Result.t()}
+          {:ok, Result.t()} | {:error, Result.t() | term()}
   def verify(%Config{} = config, app_name, opts \\ []) do
     request = Keyword.get(opts, :request, &default_request/2)
 

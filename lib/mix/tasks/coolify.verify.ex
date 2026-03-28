@@ -35,9 +35,12 @@ defmodule Mix.Tasks.Coolify.Verify do
       {:ok, result} ->
         Mix.shell().info("All #{result.total} checks passed for #{result.app}")
 
-      {:error, result} ->
-        print_failed_checks(result.checks)
-        Mix.raise("Verification failed for #{result.app}")
+      {:error, %{checks: checks, app: app}} = _result ->
+        print_failed_checks(checks)
+        Mix.raise("Verification failed for #{app}")
+
+      {:error, reason} ->
+        Mix.raise("Could not verify app: #{inspect(reason)}")
     end
   end
 

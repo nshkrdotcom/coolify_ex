@@ -4,7 +4,7 @@ defmodule CoolifyEx.MixProject do
   def project do
     [
       app: :coolify_ex,
-      version: "0.1.0",
+      version: "0.2.0",
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -38,7 +38,7 @@ defmodule CoolifyEx.MixProject do
   end
 
   defp description do
-    "Generic Elixir client and Mix-task toolkit for triggering, monitoring, and verifying Coolify deployments"
+    "Generic Elixir toolkit for deploying, monitoring runtime logs, and verifying Coolify apps"
   end
 
   defp package do
@@ -49,6 +49,8 @@ defmodule CoolifyEx.MixProject do
         "GitHub" => "https://github.com/nshkrdotcom/coolify_ex"
       },
       files: ~w(
+        assets
+        guides
         lib
         scripts
         coolify.example.exs

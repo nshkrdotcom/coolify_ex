@@ -92,6 +92,14 @@ This updates the checkout, performs the deployment, and then reruns smoke checks
 
 If you only want the deploy task's built-in verification, stop after `mix coolify.deploy`. That task already runs smoke checks unless you pass `--skip-verify`.
 
+When you need runtime logs for the currently running app rather than a specific deployment record, use:
+
+```bash
+mix coolify.app_logs --project web --lines 200 --follow
+```
+
+This resolves the manifest project to its `app_uuid`, fetches the current application log tail, and then polls for newly observed lines.
+
 ## Using `--no-push`
 
 Use `--no-push` when you already pushed the branch from another machine and only want this server to trigger Coolify:
@@ -145,10 +153,11 @@ This unit runs the same update-and-deploy flow under a dedicated user with an ex
 | The Git remote is reachable, but the current branch does not match the manifest. | `** (Mix) Coolify deploy failed: {:branch_mismatch, "main", "release"}`. | Check out the branch named by `git_branch`, change the manifest, or use `--no-push` if the branch is already pushed. |
 | The bootstrap script uses a custom path whose parent directory does not exist. | `cp` fails before `mix coolify.setup` runs. | Create the directory first with `mkdir -p` before calling `./scripts/setup_remote.sh CUSTOM_PATH`. |
 | `mix coolify.setup` says the manifest is invalid but does not explain why. | `manifest: missing or invalid (...)` with no tuple details. | Run `mix coolify.deploy --config PATH --no-push --skip-verify` or `mix coolify.verify --config PATH --project NAME` to surface the exact loader error. |
+| You need current runtime app logs but only have a manifest project name. | You know the project key, but not a deployment UUID. | Run `mix coolify.app_logs --project NAME --lines 200` so `CoolifyEx` resolves the project's `app_uuid` and calls the application-logs endpoint directly. |
 
 ## See Also
 
 - [guides/getting-started.md](getting-started.md) when you want the first deploy walkthrough before automating it on a server.
 - [guides/manifest.md](manifest.md) when you need the exact env tuple behavior and manifest discovery rules that matter on a remote host.
-- [guides/mix-tasks.md](mix-tasks.md) when you need the exact flags for `--no-push`, `--config`, and verification behavior.
+- [guides/mix-tasks.md](mix-tasks.md) when you need the exact flags for `--no-push`, `--config`, runtime log polling, and verification behavior.
 - [guides/monorepos.md](monorepos.md) when the remote server needs to deploy multiple applications from one repository.

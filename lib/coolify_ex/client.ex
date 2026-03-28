@@ -5,6 +5,7 @@ defmodule CoolifyEx.Client do
 
   @behaviour CoolifyEx.ClientBehaviour
 
+  alias CoolifyEx.ApplicationLogs
   alias CoolifyEx.Deployment
   alias CoolifyEx.LogLine
 
@@ -50,6 +51,30 @@ defmodule CoolifyEx.Client do
     end
   end
 
+  @impl true
+  def fetch_application_logs(base_url, token, app_uuid, opts \\ []) do
+    response =
+      Req.get(request(base_url, token),
+        url: "/applications/#{app_uuid}/logs",
+        params: [lines: Keyword.get(opts, :lines, 100)]
+      )
+
+    with {:ok, %{body: body}} <- response,
+         {:ok, body} <- normalize_json_body(body) do
+      logs = Map.get(body, "logs")
+
+      {:ok,
+       %ApplicationLogs{
+         app_uuid: app_uuid,
+         raw: normalize_raw_logs(logs),
+         logs: normalize_application_logs(logs)
+       }}
+    else
+      {:error, {:invalid_json_body, body, reason}} -> {:error, {:invalid_json_body, body, reason}}
+      {:error, exception} -> {:error, exception}
+    end
+  end
+
   defp request(base_url, token) do
     Req.new(
       base_url: "#{String.trim_trailing(base_url, "/")}/api/v1",
@@ -77,6 +102,30 @@ defmodule CoolifyEx.Client do
 
   defp normalize_logs(other), do: [%LogLine{output: inspect(other)}]
 
+  defp normalize_application_logs(nil), do: []
+
+  defp normalize_application_logs(logs) when is_binary(logs) do
+    logs
+    |> split_log_lines()
+    |> Enum.map(&%LogLine{output: &1})
+  end
+
+  defp normalize_application_logs(logs) when is_list(logs) do
+    Enum.map(logs, fn line ->
+      %LogLine{output: to_string(line)}
+    end)
+  end
+
+  defp normalize_application_logs(other), do: [%LogLine{output: inspect(other)}]
+
+  defp normalize_raw_logs(nil), do: nil
+  defp normalize_raw_logs(logs) when is_binary(logs), do: logs
+
+  defp normalize_raw_logs(logs) when is_list(logs),
+    do: Enum.map_join(logs, "\n", &to_string/1)
+
+  defp normalize_raw_logs(other), do: inspect(other)
+
   defp normalize_json_body(body) when is_map(body), do: {:ok, body}
 
   defp normalize_json_body(body) when is_binary(body) do
@@ -98,4 +147,12 @@ defmodule CoolifyEx.Client do
   end
 
   defp normalize_log_line(other), do: %LogLine{output: inspect(other)}
+
+  defp split_log_lines(logs) do
+    logs
+    |> String.split(~r/\r?\n/, trim: false)
+    |> Enum.reverse()
+    |> Enum.drop_while(&(&1 == ""))
+    |> Enum.reverse()
+  end
 end

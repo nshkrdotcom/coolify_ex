@@ -49,7 +49,7 @@ Add `coolify_ex` to `mix.exs`:
 ```elixir
 def deps do
   [
-    {:coolify_ex, "~> 0.1.0", runtime: false}
+    {:coolify_ex, "~> 0.2.0", runtime: false}
   ]
 end
 ```
@@ -178,6 +178,14 @@ Verification passed: 2/2 checks
 
 This means Coolify reported a successful deployment and every configured smoke check passed.
 
+Inspect the runtime log tail for the same manifest project:
+
+```bash
+mix coolify.app_logs --project web --lines 200
+```
+
+This uses the manifest's `app_uuid` to fetch application runtime logs from Coolify without needing a deployment UUID.
+
 ## What Can Go Wrong
 
 | Problem | What you see | How to fix |
@@ -186,8 +194,9 @@ This means Coolify reported a successful deployment and every configured smoke c
 | The deploy token is missing from the environment. | `** (Mix) Coolify deploy failed: {:missing_required_value, :token}` | Export `COOLIFY_TOKEN` in the shell that runs `mix`, then verify it with `printenv`. |
 | The current Git branch does not match `git_branch` in the manifest. | `** (Mix) Coolify deploy failed: {:branch_mismatch, "main", "release"}` | Check out the branch named in the manifest, or change `git_branch` to match the branch you actually deploy. |
 | `project_path` points at a directory that does not exist. | `** (Mix) Coolify deploy failed: {:project_path_not_found, "web", "apps/missing"}` | Fix the path so it points at a real directory relative to the manifest's repo root. |
-| Coolify reports a terminal failure status for the deployment. | `** (Mix) Deployment failed with status failed: DEPLOYMENT_UUID` | Inspect the deployment in Coolify and fetch logs with `mix coolify.logs DEPLOYMENT_UUID`. |
+| Coolify reports a terminal failure status for the deployment. | `** (Mix) Deployment failed with status failed: DEPLOYMENT_UUID` | Inspect the deployment in Coolify and fetch build logs with `mix coolify.logs DEPLOYMENT_UUID`. |
 | A smoke check fails after the deployment itself succeeded. | `** (Mix) Verification failed with 1 failing checks` during `mix coolify.deploy` | Fix the live app or correct the smoke-check expectations in the manifest. |
+| The app is running, but you need Phoenix runtime logs for the current container rather than one deployment record. | The deploy succeeded, but you want to inspect current requests, channels, or startup output. | Run `mix coolify.app_logs --project web --lines 200` or add `--follow` to keep polling for new lines. |
 
 ## Next Steps
 

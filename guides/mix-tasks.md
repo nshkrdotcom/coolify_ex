@@ -1,6 +1,6 @@
 # Mix Tasks
 
-This guide documents the five Mix tasks that ship with `CoolifyEx`, including every accepted flag, the exact success output shape, and the task-specific failure behavior.
+This guide documents the six Mix tasks that ship with `CoolifyEx`, including every accepted flag, the exact success output shape, and the task-specific failure behavior.
 
 ## `mix coolify.setup`
 
@@ -164,6 +164,50 @@ Each line is printed as `[timestamp] output` when a timestamp exists, or as just
 - Config load failure: `** (Mix) Could not fetch deployment logs: {:manifest_not_found, ...}` or another `inspect(reason)` value from `CoolifyEx.Config.load/2`.
 - Coolify fetch failure: `** (Mix) Could not fetch deployment logs: REASON`.
 
+## `mix coolify.app_logs`
+
+Fetches runtime logs for one configured Coolify app by resolving the manifest project to its `app_uuid`.
+
+### Flags
+
+| Field / Flag | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| `--project` | string | `nil` | no | Project to fetch logs for. Uses `default_project` when omitted. |
+| `--app` | string | `nil` | no | Alias for `--project`. |
+| `--config` | string | `nil` | no | Explicit manifest path. |
+| `--lines` | integer | `100` | no | Number of runtime log lines to request from Coolify. |
+| `--follow` | boolean | `false` | no | Poll the application-logs endpoint continuously and print only newly observed lines. |
+| `--poll-interval` | integer | `2_000` | no | Milliseconds to sleep between polls when `--follow` is enabled. |
+
+### Usage Examples
+
+```bash
+mix coolify.app_logs
+mix coolify.app_logs --project web --lines 200
+mix coolify.app_logs --project web --lines 200 --follow
+mix coolify.app_logs --project api --config deploy/.coolify_ex.exs --poll-interval 5000 # replace this
+```
+
+These cover the default project, a larger runtime log tail, a continuously polled runtime stream, and a non-default project from a custom manifest path.
+
+### What It Prints On Success
+
+```text
+booted
+handled request
+channel joined
+```
+
+Each runtime line is printed exactly once per observed line when you use `--follow`, based on overlap between the previously fetched tail and the current tail returned by Coolify.
+
+### What It Raises
+
+- Config load failure: `** (Mix) Could not load config: {:manifest_not_found, ...}` or another `inspect(reason)` value from `CoolifyEx.Config.load/2`.
+- Project selection failure: `** (Mix) Could not fetch application logs: {:unknown_project, "missing"}` or `** (Mix) Could not fetch application logs: :default_project_not_configured`.
+- Invalid `--lines`: `** (ArgumentError) application log lines must be a positive integer, got: ...`.
+- Invalid `--poll-interval`: `** (ArgumentError) application log poll interval must be a non-negative integer, got: ...`.
+- Coolify fetch failure: `** (Mix) Could not fetch application logs: REASON`.
+
 ## `mix coolify.verify`
 
 Runs the configured smoke checks without triggering a new deployment.
@@ -196,14 +240,13 @@ This is the exact success line from the task when every smoke check passes.
 ### What It Raises
 
 - Config load failure: `** (Mix) Could not load config: {:missing_required_value, :token}` and similar `inspect(reason)` output for other manifest load failures.
+- Project selection failure: `** (Mix) Could not verify app: {:unknown_project, "missing"}` or `** (Mix) Could not verify app: :default_project_not_configured`.
 - Smoke-check failure: the task first prints one line per failing check such as `Health: expected HTTP 200, got 500`, then raises `** (Mix) Verification failed for web`.
 - Relative smoke-check path with no `public_base_url`: `** (ArgumentError) scheme is required for url: /healthz`.
-- Unknown project name currently crashes the task with `** (KeyError) key :checks not found in: {:unknown_project, "missing"}` even though the library itself returns `{:error, {:unknown_project, "missing"}}`.
-- Missing `default_project` currently crashes the task with `** (UndefinedFunctionError) function :default_project_not_configured.checks/0 is undefined` when you omit `--project`, even though the library itself returns `{:error, :default_project_not_configured}`.
 
-## Deployment And Log Structs
+## Deployment And Runtime Log Structs
 
-`mix coolify.deploy`, `mix coolify.status`, and `mix coolify.logs` all work with the normalized deployment and log structs returned by `CoolifyEx.Client`.
+`mix coolify.deploy`, `mix coolify.status`, `mix coolify.logs`, and `mix coolify.app_logs` all work with normalized deployment and runtime-log structs returned by `CoolifyEx.Client` or `CoolifyEx.ApplicationLogs`.
 
 `CoolifyEx.Deployment`:
 
@@ -221,6 +264,15 @@ This is the exact success line from the task when every smoke check passes.
 | --- | --- | --- | --- | --- |
 | `timestamp` | string or `nil` | `nil` | no | Timestamp from Coolify, if provided. |
 | `output` | string | none | yes | Log line body that `mix coolify.logs` prints. |
+
+`CoolifyEx.ApplicationLogs`:
+
+| Field / Flag | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| `app_name` | string or `nil` | `nil` | no | Manifest project name when the high-level fetch API resolved one. |
+| `app_uuid` | string | none | yes | Coolify application UUID used for the runtime log request. |
+| `raw` | string or `nil` | `nil` | no | Raw log body returned by Coolify before line splitting. |
+| `logs` | list of `CoolifyEx.LogLine` | `[]` | no | Runtime log lines derived from the raw application log string. |
 
 ## Composing Tasks
 
@@ -256,9 +308,10 @@ deployment_uuid=$(printf '%s\n' "$output" | sed -n 's/^Deployment finished: //p'
 
 mix coolify.status "$deployment_uuid" --config .coolify_ex.exs
 mix coolify.logs "$deployment_uuid" --config .coolify_ex.exs --tail 200
+mix coolify.app_logs --config .coolify_ex.exs --project web --lines 200
 ```
 
-This script captures the deployment UUID from the task output and then uses the status and logs tasks for manual inspection.
+This script captures the deployment UUID from the task output and then uses the status, deployment-log, and runtime-log tasks for manual inspection.
 
 ## See Also
 
