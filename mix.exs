@@ -50,8 +50,6 @@ defmodule CoolifyEx.MixProject do
       },
       files: ~w(
         lib
-        guides
-        assets
         scripts
         coolify.example.exs
         mix.exs

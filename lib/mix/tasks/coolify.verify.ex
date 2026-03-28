@@ -4,6 +4,7 @@ defmodule Mix.Tasks.Coolify.Verify do
   @shortdoc "Runs smoke checks against a configured Coolify app"
 
   alias CoolifyEx.Config
+  alias CoolifyEx.MixTaskSupport
   alias CoolifyEx.Verifier
 
   @moduledoc """
@@ -15,6 +16,8 @@ defmodule Mix.Tasks.Coolify.Verify do
 
   @impl Mix.Task
   def run(args) do
+    MixTaskSupport.ensure_started!()
+
     {opts, _argv, _invalid} =
       OptionParser.parse(args, strict: [project: :string, app: :string, config: :string])
 

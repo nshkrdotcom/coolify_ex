@@ -5,6 +5,7 @@ defmodule Mix.Tasks.Coolify.Deploy do
 
   alias CoolifyEx.Config
   alias CoolifyEx.Deployer
+  alias CoolifyEx.MixTaskSupport
   alias CoolifyEx.Verifier
 
   @moduledoc """
@@ -18,6 +19,8 @@ defmodule Mix.Tasks.Coolify.Deploy do
 
   @impl Mix.Task
   def run(args) do
+    MixTaskSupport.ensure_started!()
+
     {opts, _argv, _invalid} =
       OptionParser.parse(args,
         strict: [

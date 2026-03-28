@@ -5,6 +5,7 @@ defmodule Mix.Tasks.Coolify.Logs do
 
   alias CoolifyEx.Client
   alias CoolifyEx.Config
+  alias CoolifyEx.MixTaskSupport
 
   @moduledoc """
   Prints deployment logs from Coolify.
@@ -15,6 +16,8 @@ defmodule Mix.Tasks.Coolify.Logs do
 
   @impl Mix.Task
   def run(args) do
+    MixTaskSupport.ensure_started!()
+
     {opts, argv, _invalid} = OptionParser.parse(args, strict: [config: :string, tail: :integer])
 
     case argv do

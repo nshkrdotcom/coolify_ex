@@ -5,6 +5,7 @@ defmodule Mix.Tasks.Coolify.Status do
 
   alias CoolifyEx.Client
   alias CoolifyEx.Config
+  alias CoolifyEx.MixTaskSupport
 
   @moduledoc """
   Fetches a deployment by UUID.
@@ -15,6 +16,8 @@ defmodule Mix.Tasks.Coolify.Status do
 
   @impl Mix.Task
   def run(args) do
+    MixTaskSupport.ensure_started!()
+
     {opts, argv, _invalid} = OptionParser.parse(args, strict: [config: :string])
 
     case argv do

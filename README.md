@@ -11,26 +11,44 @@
   <a href="https://github.com/nshkrdotcom/coolify_ex"><img src="https://img.shields.io/badge/github-nshkrdotcom%2Fcoolify__ex-24292f?style=flat&logo=github" alt="GitHub" /></a>
 </p>
 
-Generic Elixir tooling for triggering, monitoring, and verifying Coolify
-deployments from a local workstation or a remote server.
+`CoolifyEx` is an Elixir library and set of Mix tasks for triggering an existing Coolify application, waiting for the deployment to reach a terminal state, and then running smoke checks against the live app. It does not create applications in Coolify, replace your Dockerfile or build strategy, or act as a CI/CD system; the main use case is an operator-driven deploy from a trusted workstation or remote server that already has Git, Mix, and the right credentials.
 
-`CoolifyEx` is deliberately generic:
+## How It Fits in Your Stack
 
-- it is not tied to Phoenix or a specific framework
-- it supports top-level Mix apps and monorepos
-- it keeps deployment orchestration in Elixir instead of hiding it in ad hoc
-  shell scripts
-- it works well for operator-driven deployments from a trusted host
+Your Git repository stays the source of truth. A local manifest tells `CoolifyEx` which Coolify application UUID to deploy, which branch must be current, which smoke checks to run, and which values to resolve from the environment. `CoolifyEx` can then push Git, call the Coolify API, poll deployment status, and finally verify the live URL that Coolify is serving.
 
-## Features
+```text
+Git repo on trusted host
+  |
+  | load manifest + resolve {:env, "NAME"} tuples
+  v
+CoolifyEx (Mix task or library call)
+  |
+  | optional git push remote branch
+  | start deployment via Coolify API
+  v
+Coolify deployment
+  |
+  | poll deployment UUID until success or failure
+  v
+Running application
+  |
+  | GET/HEAD smoke checks
+  v
+Verification result
+```
 
-- Manifest-driven deployment config in a repo-root `.coolify_ex.exs` file
-- Coolify API client built on `Req`
-- Optional Git push before deployment
-- Deployment polling with normalized status and logs
-- Smoke-check verification against live URLs
-- Mix tasks for setup, deploy, status, logs, and verify
-- Support for both single-app repos and multi-app monorepos
+This flow keeps deployment intent in your repository while leaving the actual build and runtime environment under Coolify's control.
+
+## Prerequisites
+
+- A running Coolify instance that you can reach from the deployment machine.
+- An application that already exists in Coolify; `CoolifyEx` does not create it.
+- API access enabled in Coolify.
+- A Coolify API token with permission to start deployments.
+- The application UUID for each Coolify app you want to trigger.
+- Elixir `~> 1.18`, Mix, Git, and `curl` on the machine that will run the Mix tasks.
+- Network access from that machine to the Coolify panel, the Git remote, and each public URL you plan to smoke-check.
 
 ## Installation
 
@@ -44,53 +62,130 @@ def deps do
 end
 ```
 
-Use `runtime: false` when `CoolifyEx` powers deployment tooling rather than
-your runtime supervision tree.
+This adds `CoolifyEx` as an operator tool instead of a runtime application process, which matches how the library is used by Mix tasks and deploy scripts.
+
+`CoolifyEx` targets Elixir `~> 1.18`; its runtime dependencies are `Req` and `Jason`, and its dev/test dependencies are `credo`, `dialyxir`, `ex_doc`, and `bypass`.
 
 ## Quick Start
 
-1. In Coolify, enable API access.
-2. Create an API token with deploy permission.
-3. Capture the Coolify application UUID for each app you want to drive.
-4. Clone the repo that contains `CoolifyEx` onto the machine that will trigger
-   deployments.
-5. Run the remote bootstrap script:
+1. Enable API access in the Coolify UI.
+
+```bash
+# Coolify UI
+# Settings -> Configuration -> Advanced
+# Enable API access, then save the change.
+```
+
+This turns on the API endpoints that `CoolifyEx` calls during deploy and status checks.
+
+2. Create a token with deployment access.
+
+```bash
+# Coolify UI
+# Keys & Tokens -> API Tokens
+# Create a token that can start deployments, then copy it somewhere safe.
+```
+
+This gives the deployment machine a bearer token for the Coolify API.
+
+3. Copy the application UUID from Coolify.
+
+```bash
+# Coolify UI
+# Open the application you want to deploy.
+# Copy the application UUID that identifies this app in the API.
+```
+
+You need one UUID per manifest project entry.
+
+4. Add the dependency and fetch it locally.
+
+```elixir
+def deps do
+  [
+    {:coolify_ex, "~> 0.1.0", runtime: false}
+  ]
+end
+```
+
+This makes the Mix tasks and library code available in your project.
+
+```bash
+mix deps.get
+```
+
+This installs `CoolifyEx` and its dependencies into the current project.
+
+5. Run the bootstrap script from the repository root.
 
 ```bash
 ./scripts/setup_remote.sh
 ```
 
-6. Export your local deployment environment variables:
+This checks for `git`, `curl`, and `mix`, copies `coolify.example.exs` to `.coolify_ex.exs` if that file does not exist yet, runs `mix deps.get`, and then runs `mix coolify.setup --config .coolify_ex.exs`.
+
+6. Export the environment variables that the manifest will resolve.
 
 ```bash
-export COOLIFY_BASE_URL="https://coolify.example.com"
-export COOLIFY_TOKEN="your-api-token"
-export COOLIFY_WEB_APP_UUID="your-app-uuid"
+export COOLIFY_BASE_URL="https://coolify.example.com" # replace this
+export COOLIFY_TOKEN="coolify-api-token" # replace this
+export COOLIFY_WEB_APP_UUID="00000000-0000-0000-0000-000000000000" # replace this
 ```
 
-7. Copy `coolify.example.exs` to `.coolify_ex.exs`, edit it, then deploy:
+These values stay on the trusted machine and are read at manifest load time through `{:env, "NAME"}` tuples.
+
+7. Copy the shipped example manifest if you did not use the bootstrap script.
+
+```bash
+cp coolify.example.exs .coolify_ex.exs
+```
+
+This creates the default manifest file name that `CoolifyEx` will discover first.
+
+8. Edit the manifest with the real UUIDs, branch, and smoke-check URLs.
+
+```bash
+${EDITOR:-vi} .coolify_ex.exs
+```
+
+This is where you bind your local repository to one or more Coolify applications.
+
+9. Trigger the first deployment.
 
 ```bash
 mix coolify.deploy
 ```
 
+On success, the task prints `Deployment finished: DEPLOYMENT_UUID` and then `Verification passed: PASSED/TOTAL checks` unless you used `--skip-verify`.
+
 ## Example Manifest
 
 ```elixir
 %{
+  # Present in the shipped example; the loader currently ignores this key.
   version: 1,
+  # Coolify panel URL, resolved from the local shell environment.
   base_url: {:env, "COOLIFY_BASE_URL"},
+  # Coolify API token, also resolved from the local shell environment.
   token: {:env, "COOLIFY_TOKEN"},
+  # Project selected when you omit --project.
   default_project: :web,
   projects: %{
     web: %{
+      # The Coolify application UUID for this project entry.
       app_uuid: {:env, "COOLIFY_WEB_APP_UUID"},
+      # Branch that must be checked out locally before deploy unless you use --no-push.
       git_branch: "main",
+      # Git remote used for the optional push step.
       git_remote: "origin",
+      # Use "." for a top-level app or a relative child path for a monorepo app.
       project_path: ".",
-      public_base_url: "https://example.com",
+      # Public URL used to expand smoke-check paths such as "/healthz".
+      public_base_url: "https://example.com", # replace this
       smoke_checks: [
+        # GET https://example.com/ and expect HTTP 200.
         %{name: "Landing page", url: "/", expected_status: 200},
+        # GET https://example.com/healthz, expect HTTP 200, and require "ok" in the body.
         %{name: "Health", url: "/healthz", expected_status: 200, expected_body_contains: "ok"}
       ]
     }
@@ -98,56 +193,33 @@ mix coolify.deploy
 }
 ```
 
-Relative smoke-check URLs are expanded against `public_base_url`.
+This is the shipped `coolify.example.exs` with inline comments describing how each field affects loading, deployment, and verification.
 
-## Remote-Server Flow
+## Mix Tasks At A Glance
 
-`CoolifyEx` is especially useful when you do not want a GitHub Actions-based
-deployment pipeline and instead prefer to deploy from a server you control.
+| Task | What it does | Example |
+| --- | --- | --- |
+| `mix coolify.setup` | Prints a local or remote-server checklist, checks for `git`, `curl`, and `mix`, and tries to load the manifest. | `mix coolify.setup --config .coolify_ex.exs` |
+| `mix coolify.deploy` | Optionally pushes Git, starts a Coolify deployment, waits for completion, and optionally verifies smoke checks. | `mix coolify.deploy --project web --force` |
+| `mix coolify.status` | Fetches one deployment by UUID and prints its status plus the Coolify logs URL when available. | `mix coolify.status DEPLOYMENT_UUID` |
+| `mix coolify.logs` | Fetches one deployment by UUID and prints normalized log lines. | `mix coolify.logs DEPLOYMENT_UUID --tail 50` |
+| `mix coolify.verify` | Runs the manifest's smoke checks without starting a new deployment. | `mix coolify.verify --project web` |
 
-Typical flow:
+## Key Behaviors
 
-1. Keep the deployment credentials on the remote server.
-2. Run `./scripts/setup_remote.sh` once after cloning.
-3. Edit the local `.coolify_ex.exs`.
-4. Trigger deploys with:
-
-```bash
-mix coolify.deploy
-```
-
-Useful variants:
-
-```bash
-mix coolify.deploy --project web
-mix coolify.deploy --no-push
-mix coolify.deploy --force --instant
-mix coolify.verify --project web
-mix coolify.logs DEPLOYMENT_UUID --tail 50
-```
-
-## Monorepos
-
-`CoolifyEx` supports monorepos by letting one manifest describe many Coolify
-applications.
-
-Each project entry can point at its own:
-
-- Coolify application UUID
-- `project_path`
-- public verification URL
-- smoke-check set
-
-Git still pushes from the repository root, which matches how normal monorepo
-checkouts behave.
+- Relative smoke-check URLs are expanded only when the URL starts with `/` and `public_base_url` is a string. Otherwise the URL is kept exactly as written.
+- `mix coolify.deploy --no-push` skips the Git push step but still loads the manifest, starts the deployment, waits for Coolify, and verifies unless you also pass `--skip-verify`.
+- `project_path` must point to an existing directory when the manifest loads, but Git pushes always happen from `repo_root`, which is the directory that contains the manifest.
+- If the Coolify deployment succeeds and a smoke check fails afterward, `mix coolify.deploy` raises `Verification failed with N failing checks`; it does not roll back or mark the deployment itself as failed in Coolify.
+- Manifest loading is eager. If any `{:env, "NAME"}` tuple resolves to `nil` for a required field, the whole load fails before any task-specific work begins.
 
 ## Documentation
 
-- [Getting Started](guides/getting-started.md)
-- [Manifest Format](guides/manifest.md)
-- [Monorepos and Phoenix Apps](guides/monorepos.md)
-- [Remote Server Setup](guides/remote-server.md)
-- [Mix Tasks](guides/mix-tasks.md)
+- [Getting Started](guides/getting-started.md) for the first end-to-end deploy from a trusted machine.
+- [Manifest Format](guides/manifest.md) for file discovery, env tuples, path validation, and smoke-check rules.
+- [Mix Tasks](guides/mix-tasks.md) for every CLI flag, success message, and failure mode.
+- [Monorepos and Phoenix Apps](guides/monorepos.md) for one manifest that targets multiple deployable applications.
+- [Remote Server Setup](guides/remote-server.md) for keeping credentials off developer laptops and CI.
 
 ## License
 
