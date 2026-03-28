@@ -31,9 +31,6 @@
     <clipPath id="hexClip">
       <polygon points="100,12 174,56 174,144 100,188 26,144 26,56"/>
     </clipPath>
-    <filter id="shadow" x="12" y="8" width="176" height="184" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#020617" flood-opacity="0.45"/>
-    </filter>
     <filter id="softGlow" x="40" y="34" width="120" height="132" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
       <feGaussianBlur stdDeviation="6" result="blur"/>
       <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.65 0"/>
@@ -42,7 +39,7 @@
     <path id="armDetail" d="M100 56L109 76L100 92L91 76L100 56Z" />
   </defs>
 
-  <rect width="200" height="200" rx="32" fill="url(#bg)"/>
+  <polygon points="100,14 172,56 172,144 100,186 28,144 28,56" fill="url(#bg)"/>
   <g clip-path="url(#hexClip)">
     <rect x="18" y="18" width="164" height="164" fill="url(#grid)"/>
     <circle cx="100" cy="100" r="88" fill="url(#glow)"/>
@@ -51,7 +48,7 @@
     <path d="M100 12V188" stroke="#E2E8F0" stroke-opacity="0.08" stroke-width="1.5"/>
   </g>
 
-  <g filter="url(#shadow)">
+  <g>
     <polygon points="100,14 172,56 172,144 100,186 28,144 28,56" fill="url(#panel)" stroke="#93C5FD" stroke-opacity="0.3" stroke-width="2"/>
     <polygon points="100,28 160,63 160,137 100,172 40,137 40,63" fill="none" stroke="url(#edge)" stroke-opacity="0.5" stroke-width="1.5"/>
   </g>
