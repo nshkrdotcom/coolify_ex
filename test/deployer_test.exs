@@ -46,9 +46,21 @@ defmodule CoolifyEx.DeployerTest do
     %Config{
       base_url: "https://coolify.example.com",
       token: "secret",
+      default_project: "web",
       default_app: "web",
       manifest_path: "/repo/coolify.exs",
       repo_root: "/repo",
+      projects: %{
+        "web" => %App{
+          name: "web",
+          app_uuid: "app-123",
+          git_branch: "main",
+          git_remote: "origin",
+          project_path: ".",
+          public_base_url: "https://app.example.com",
+          smoke_checks: []
+        }
+      },
       apps: %{
         "web" => %App{
           name: "web",

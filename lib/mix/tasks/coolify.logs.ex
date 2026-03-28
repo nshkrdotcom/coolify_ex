@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Coolify.Logs do
 
     case argv do
       [deployment_uuid] ->
-        case Config.load(Keyword.get(opts, :config, "coolify.exs")) do
+        case Config.load(Keyword.get(opts, :config)) do
           {:ok, config} ->
             fetch_and_print_logs(config, deployment_uuid, Keyword.get(opts, :tail, 100))
 

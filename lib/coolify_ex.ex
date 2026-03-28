@@ -19,8 +19,8 @@ defmodule CoolifyEx do
   alias CoolifyEx.Deployer
   alias CoolifyEx.Verifier
 
-  @spec load_config(Path.t(), keyword()) :: {:ok, Config.t()} | {:error, term()}
-  def load_config(path \\ "coolify.exs", opts \\ []) do
+  @spec load_config(Path.t() | nil, keyword()) :: {:ok, Config.t()} | {:error, term()}
+  def load_config(path \\ nil, opts \\ []) do
     Config.load(path, opts)
   end
 

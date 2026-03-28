@@ -8,7 +8,8 @@ than from GitHub Actions. `CoolifyEx` supports that model directly.
 On the server:
 
 1. Clone the repository that contains `CoolifyEx`.
-2. Keep a local `coolify.exs` file that is not committed.
+2. Keep a local `.coolify_ex.exs` file that is not committed if it contains
+   host-specific overrides.
 3. Store `COOLIFY_*` values in local shell startup or secrets files.
 4. Trigger deployments with Mix tasks from that machine.
 
@@ -23,7 +24,7 @@ Run:
 If you want a different manifest path:
 
 ```bash
-./scripts/setup_remote.sh deploy/coolify.exs
+./scripts/setup_remote.sh deploy/.coolify_ex.exs
 ```
 
 ## Environment Variables

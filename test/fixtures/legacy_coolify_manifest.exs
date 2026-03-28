@@ -2,8 +2,8 @@
   version: 1,
   base_url: {:env, "COOLIFY_BASE_URL"},
   token: {:env, "COOLIFY_TOKEN"},
-  default_project: :web,
-  projects: %{
+  default_app: :web,
+  apps: %{
     web: %{
       app_uuid: {:env, "COOLIFY_WEB_APP_UUID"},
       git_branch: "main",
@@ -11,13 +11,7 @@
       project_path: ".",
       public_base_url: "https://app.example.com",
       smoke_checks: [
-        %{name: "Root", url: "/", expected_status: 200},
-        %{
-          name: "Health",
-          url: "/healthz",
-          expected_status: 200,
-          expected_body_contains: "healthy"
-        }
+        %{name: "Root", url: "/", expected_status: 200}
       ]
     }
   }

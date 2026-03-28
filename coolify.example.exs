@@ -2,8 +2,8 @@
   version: 1,
   base_url: {:env, "COOLIFY_BASE_URL"},
   token: {:env, "COOLIFY_TOKEN"},
-  default_app: :web,
-  apps: %{
+  default_project: :web,
+  projects: %{
     web: %{
       app_uuid: {:env, "COOLIFY_WEB_APP_UUID"},
       git_branch: "main",

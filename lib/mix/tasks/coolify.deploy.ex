@@ -11,9 +11,9 @@ defmodule Mix.Tasks.Coolify.Deploy do
   Deploys one configured Coolify app.
 
       mix coolify.deploy
-      mix coolify.deploy --app web
-      mix coolify.deploy --app api --no-push --force
-      mix coolify.deploy --config config/coolify.exs --skip-verify
+      mix coolify.deploy --project web
+      mix coolify.deploy --project api --no-push --force
+      mix coolify.deploy --config .coolify_ex.exs --skip-verify
   """
 
   @impl Mix.Task
@@ -21,6 +21,7 @@ defmodule Mix.Tasks.Coolify.Deploy do
     {opts, _argv, _invalid} =
       OptionParser.parse(args,
         strict: [
+          project: :string,
           app: :string,
           config: :string,
           force: :boolean,
@@ -32,14 +33,14 @@ defmodule Mix.Tasks.Coolify.Deploy do
         ]
       )
 
-    case Config.load(Keyword.get(opts, :config, "coolify.exs")) do
+    case Config.load(Keyword.get(opts, :config)) do
       {:ok, config} -> run_deploy(config, opts)
       {:error, reason} -> Mix.raise("Coolify deploy failed: #{inspect(reason)}")
     end
   end
 
   defp run_deploy(config, opts) do
-    case Deployer.deploy(config, Keyword.get(opts, :app), deploy_opts(opts)) do
+    case Deployer.deploy(config, target_name(opts), deploy_opts(opts)) do
       {:ok, deployment} ->
         Mix.shell().info("Deployment finished: #{deployment.uuid}")
         maybe_verify(config, opts)
@@ -69,7 +70,7 @@ defmodule Mix.Tasks.Coolify.Deploy do
     if Keyword.get(opts, :skip_verify, false) do
       :ok
     else
-      case Verifier.verify(config, Keyword.get(opts, :app)) do
+      case Verifier.verify(config, target_name(opts)) do
         {:ok, result} ->
           Mix.shell().info("Verification passed: #{result.passed}/#{result.total} checks")
 
@@ -78,4 +79,6 @@ defmodule Mix.Tasks.Coolify.Deploy do
       end
     end
   end
+
+  defp target_name(opts), do: Keyword.get(opts, :project) || Keyword.get(opts, :app)
 end

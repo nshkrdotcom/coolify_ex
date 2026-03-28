@@ -24,7 +24,7 @@ deployments from a local workstation or a remote server.
 
 ## Features
 
-- Manifest-driven deployment config in local `coolify.exs` files
+- Manifest-driven deployment config in a repo-root `.coolify_ex.exs` file
 - Coolify API client built on `Req`
 - Optional Git push before deployment
 - Deployment polling with normalized status and logs
@@ -68,7 +68,7 @@ export COOLIFY_TOKEN="your-api-token"
 export COOLIFY_WEB_APP_UUID="your-app-uuid"
 ```
 
-7. Copy `coolify.example.exs` to `coolify.exs`, edit it, then deploy:
+7. Copy `coolify.example.exs` to `.coolify_ex.exs`, edit it, then deploy:
 
 ```bash
 mix coolify.deploy
@@ -81,8 +81,8 @@ mix coolify.deploy
   version: 1,
   base_url: {:env, "COOLIFY_BASE_URL"},
   token: {:env, "COOLIFY_TOKEN"},
-  default_app: :web,
-  apps: %{
+  default_project: :web,
+  projects: %{
     web: %{
       app_uuid: {:env, "COOLIFY_WEB_APP_UUID"},
       git_branch: "main",
@@ -109,7 +109,7 @@ Typical flow:
 
 1. Keep the deployment credentials on the remote server.
 2. Run `./scripts/setup_remote.sh` once after cloning.
-3. Edit the local `coolify.exs`.
+3. Edit the local `.coolify_ex.exs`.
 4. Trigger deploys with:
 
 ```bash
@@ -119,10 +119,10 @@ mix coolify.deploy
 Useful variants:
 
 ```bash
-mix coolify.deploy --app web
+mix coolify.deploy --project web
 mix coolify.deploy --no-push
 mix coolify.deploy --force --instant
-mix coolify.verify --app web
+mix coolify.verify --project web
 mix coolify.logs DEPLOYMENT_UUID --tail 50
 ```
 
@@ -131,7 +131,7 @@ mix coolify.logs DEPLOYMENT_UUID --tail 50
 `CoolifyEx` supports monorepos by letting one manifest describe many Coolify
 applications.
 
-Each app entry can point at its own:
+Each project entry can point at its own:
 
 - Coolify application UUID
 - `project_path`

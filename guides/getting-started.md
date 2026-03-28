@@ -28,7 +28,7 @@ Do these steps once in the Coolify UI:
    Go to `Keys & Tokens -> API Tokens`, create a token, and include deploy
    permission.
 3. Capture each application UUID.
-   You need one Coolify application UUID per app entry in your manifest.
+   You need one Coolify application UUID per project entry in your manifest.
 4. Confirm the public URL you want to verify after deployment.
    This becomes `public_base_url` in the manifest.
 
@@ -45,7 +45,7 @@ That script:
 
 - checks for the required tools
 - installs Mix dependencies
-- creates `coolify.exs` from `coolify.example.exs` if needed
+- creates `.coolify_ex.exs` from `coolify.example.exs` if needed
 - runs `mix coolify.setup`
 
 ## Local Environment Variables
@@ -64,8 +64,8 @@ you source before deploying.
 
 ## First Deployment
 
-1. Copy and edit `coolify.exs`.
-2. Confirm the app name and smoke checks.
+1. Copy and edit `.coolify_ex.exs`.
+2. Confirm the project name and smoke checks.
 3. Push your branch or let `mix coolify.deploy` push it for you.
 4. Trigger and verify:
 
@@ -76,10 +76,10 @@ mix coolify.deploy
 Useful variants:
 
 ```bash
-mix coolify.deploy --app web
+mix coolify.deploy --project web
 mix coolify.deploy --no-push
 mix coolify.deploy --force --instant
-mix coolify.verify --app web
+mix coolify.verify --project web
 ```
 
 ## What CoolifyEx Does

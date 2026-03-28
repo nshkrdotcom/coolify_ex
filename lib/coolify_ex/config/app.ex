@@ -1,6 +1,6 @@
 defmodule CoolifyEx.Config.App do
   @moduledoc """
-  One app entry from a `coolify.exs` manifest.
+  One project entry from a deployment manifest.
   """
 
   alias CoolifyEx.SmokeCheck

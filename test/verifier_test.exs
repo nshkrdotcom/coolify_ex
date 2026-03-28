@@ -34,9 +34,28 @@ defmodule CoolifyEx.VerifierTest do
     %Config{
       base_url: "https://coolify.example.com",
       token: "secret",
+      default_project: "web",
       default_app: "web",
       manifest_path: "/repo/coolify.exs",
       repo_root: "/repo",
+      projects: %{
+        "web" => %App{
+          name: "web",
+          app_uuid: "app-123",
+          git_branch: "main",
+          git_remote: "origin",
+          project_path: ".",
+          public_base_url: "https://app.example.com",
+          smoke_checks: [
+            %SmokeCheck{name: "root", url: "https://app.example.com/", expected_status: 200},
+            %SmokeCheck{
+              name: "health",
+              url: "https://app.example.com/healthz",
+              expected_status: 200
+            }
+          ]
+        }
+      },
       apps: %{
         "web" => %App{
           name: "web",

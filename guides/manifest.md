@@ -1,7 +1,10 @@
 # Manifest Format
 
-`CoolifyEx` reads a local `coolify.exs` file. The file is normal Elixir and
-should evaluate to a map or keyword list.
+`CoolifyEx` reads a local deployment manifest. By default it looks for
+`./.coolify_ex.exs`, then `./.coolify.exs`, then `./coolify.exs`, walking up
+parent directories until it reaches the filesystem root.
+
+The file itself is normal Elixir and should evaluate to a map or keyword list.
 
 ## Example
 
@@ -10,8 +13,8 @@ should evaluate to a map or keyword list.
   version: 1,
   base_url: {:env, "COOLIFY_BASE_URL"},
   token: {:env, "COOLIFY_TOKEN"},
-  default_app: :web,
-  apps: %{
+  default_project: :web,
+  projects: %{
     web: %{
       app_uuid: {:env, "COOLIFY_WEB_APP_UUID"},
       git_branch: "main",
@@ -33,19 +36,21 @@ should evaluate to a map or keyword list.
 | --- | --- | --- |
 | `:base_url` | yes | Coolify base URL such as `https://coolify.example.com` |
 | `:token` | yes | Coolify API token |
-| `:default_app` | no | App name used when a Mix task does not receive `--app` |
-| `:apps` | yes | Map of app names to app configuration |
+| `:default_project` | no | Project name used when a Mix task does not receive `--project` |
+| `:projects` | yes | Map of project names to project configuration |
 
 `{:env, "NAME"}` tuples are resolved against the local shell environment.
 
-## App Keys
+Legacy `:default_app` and `:apps` keys are still accepted for compatibility.
+
+## Project Keys
 
 | Key | Required | Description |
 | --- | --- | --- |
 | `:app_uuid` | yes | Coolify application UUID |
 | `:git_branch` | no | Branch that must be checked out before deploy; defaults to `main` |
 | `:git_remote` | no | Git remote used for push; defaults to `origin` |
-| `:project_path` | no | Relative path inside the repo for the app entry; defaults to `.` |
+| `:project_path` | no | Relative path inside the repo for the project entry; defaults to `.` |
 | `:public_base_url` | no | Base URL used to expand relative smoke-check URLs |
 | `:smoke_checks` | no | List of verification checks to run after deployment |
 
@@ -68,6 +73,6 @@ Git checkout works for top-level repos and monorepos alike.
 
 `project_path` is still important:
 
-- it documents which subtree the app entry represents
+- it documents which subtree the project entry represents
 - it is validated when the manifest loads
 - it keeps multi-app manifests readable and explicit

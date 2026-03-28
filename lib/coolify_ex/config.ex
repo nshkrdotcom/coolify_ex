@@ -1,55 +1,123 @@
 defmodule CoolifyEx.Config do
   @moduledoc """
-  Loads and normalizes `coolify.exs` manifests.
+  Loads and normalizes deployment manifests.
 
-  A manifest is a local Elixir file that returns a map or keyword list. Secrets
-  can be provided directly or resolved from environment variables with
+  By default, `CoolifyEx` looks for one of these manifest files, searching the
+  current directory and then parent directories until it reaches the filesystem
+  root:
+
+  - `.coolify_ex.exs`
+  - `.coolify.exs`
+  - `coolify.exs`
+
+  The manifest itself is a local Elixir file that returns a map or keyword list.
+  Secrets can be provided directly or resolved from environment variables with
   `{:env, "NAME"}` tuples.
   """
 
   alias CoolifyEx.Config.App
   alias CoolifyEx.SmokeCheck
 
+  @default_manifest_names [".coolify_ex.exs", ".coolify.exs", "coolify.exs"]
+
   @enforce_keys [:base_url, :token, :apps]
-  defstruct [:base_url, :token, :default_app, :manifest_path, :repo_root, apps: %{}]
+  defstruct [
+    :base_url,
+    :token,
+    :default_project,
+    :default_app,
+    :manifest_path,
+    :repo_root,
+    projects: %{},
+    apps: %{}
+  ]
 
   @type env_source :: %{optional(String.t()) => String.t()}
 
   @type t :: %__MODULE__{
           base_url: String.t(),
           token: String.t(),
+          default_project: String.t() | nil,
           default_app: String.t() | nil,
+          projects: %{optional(String.t()) => App.t()},
           apps: %{optional(String.t()) => App.t()},
           manifest_path: Path.t(),
           repo_root: Path.t()
         }
 
-  @spec load(Path.t(), keyword()) :: {:ok, t()} | {:error, term()}
-  def load(path \\ "coolify.exs", opts \\ []) do
-    env = Keyword.get(opts, :env, System.get_env())
-    manifest_path = Path.expand(path)
+  @spec default_manifest_names() :: [String.t()]
+  def default_manifest_names, do: @default_manifest_names
 
-    with true <- File.exists?(manifest_path) or {:error, {:manifest_not_found, manifest_path}},
+  @spec load(Path.t() | nil, keyword()) :: {:ok, t()} | {:error, term()}
+  def load(path \\ nil, opts \\ []) do
+    env = Keyword.get(opts, :env, System.get_env())
+
+    with {:ok, manifest_path} <- resolve_manifest_path(path, opts),
          {:ok, raw_manifest} <- read_manifest(manifest_path) do
       normalize_manifest(raw_manifest, manifest_path, env)
     end
   end
 
-  @spec fetch_app(t(), String.t() | atom() | nil) :: {:ok, App.t()} | {:error, term()}
-  def fetch_app(config, app_name \\ nil)
+  @spec fetch_project(t(), String.t() | atom() | nil) :: {:ok, App.t()} | {:error, term()}
+  def fetch_project(config, project_name \\ nil)
 
-  def fetch_app(%__MODULE__{default_app: nil}, nil), do: {:error, :default_app_not_configured}
+  def fetch_project(%__MODULE__{default_project: nil}, nil),
+    do: {:error, :default_project_not_configured}
 
-  def fetch_app(%__MODULE__{default_app: default_app} = config, nil) do
-    fetch_app(config, default_app)
+  def fetch_project(%__MODULE__{default_project: default_project} = config, nil) do
+    fetch_project(config, default_project)
   end
 
-  def fetch_app(%__MODULE__{apps: apps}, app_name) do
-    key = normalize_name(app_name)
+  def fetch_project(%__MODULE__{projects: projects}, project_name) do
+    key = normalize_name(project_name)
 
-    case Map.fetch(apps, key) do
-      {:ok, app} -> {:ok, app}
-      :error -> {:error, {:unknown_app, key}}
+    case Map.fetch(projects, key) do
+      {:ok, project} -> {:ok, project}
+      :error -> {:error, {:unknown_project, key}}
+    end
+  end
+
+  @spec fetch_app(t(), String.t() | atom() | nil) :: {:ok, App.t()} | {:error, term()}
+  def fetch_app(config, app_name \\ nil), do: fetch_project(config, app_name)
+
+  defp resolve_manifest_path(nil, opts) do
+    cwd = Keyword.get(opts, :cwd, File.cwd!())
+
+    case discover_manifest_path(cwd) do
+      nil -> {:error, {:manifest_not_found, Path.expand(cwd), @default_manifest_names}}
+      path -> {:ok, path}
+    end
+  end
+
+  defp resolve_manifest_path(path, _opts) do
+    manifest_path = Path.expand(path)
+
+    if File.exists?(manifest_path) do
+      {:ok, manifest_path}
+    else
+      {:error, {:manifest_not_found, manifest_path}}
+    end
+  end
+
+  defp discover_manifest_path(start_dir) do
+    start_dir
+    |> Path.expand()
+    |> do_discover_manifest_path()
+  end
+
+  defp do_discover_manifest_path(dir) do
+    case Enum.find(@default_manifest_names, &File.exists?(Path.join(dir, &1))) do
+      nil ->
+        parent = Path.dirname(dir)
+
+        if parent == dir do
+          nil
+        else
+          do_discover_manifest_path(parent)
+        end
+
+      name ->
+        Path.join(dir, name)
     end
   end
 
@@ -66,39 +134,46 @@ defmodule CoolifyEx.Config do
 
     with {:ok, base_url} <- fetch_required(manifest, :base_url, env),
          {:ok, token} <- fetch_required(manifest, :token, env),
-         {:ok, apps} <- normalize_apps(Map.get(manifest, :apps), repo_root, env) do
+         {:ok, projects} <- normalize_projects(project_entries(manifest), repo_root, env) do
+      default_project =
+        manifest
+        |> Map.get(:default_project, Map.get(manifest, :default_app))
+        |> normalize_optional_name()
+
       {:ok,
        %__MODULE__{
          base_url: base_url,
          token: token,
-         default_app: normalize_optional_name(Map.get(manifest, :default_app)),
-         apps: apps,
+         default_project: default_project,
+         default_app: default_project,
+         projects: projects,
+         apps: projects,
          manifest_path: manifest_path,
          repo_root: repo_root
        }}
     end
   end
 
-  defp normalize_apps(nil, _repo_root, _env), do: {:error, :apps_not_configured}
+  defp normalize_projects(nil, _repo_root, _env), do: {:error, :projects_not_configured}
 
-  defp normalize_apps(apps, repo_root, env) do
-    apps
+  defp normalize_projects(projects, repo_root, env) do
+    projects
     |> normalize_container()
     |> Enum.reduce_while({:ok, %{}}, fn {name, attrs}, {:ok, acc} ->
-      case normalize_app(name, attrs, repo_root, env) do
-        {:ok, app} -> {:cont, {:ok, Map.put(acc, app.name, app)}}
+      case normalize_project(name, attrs, repo_root, env) do
+        {:ok, project} -> {:cont, {:ok, Map.put(acc, project.name, project)}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
   end
 
-  defp normalize_app(name, attrs, repo_root, env) do
+  defp normalize_project(name, attrs, repo_root, env) do
     attrs = normalize_container(attrs)
-    app_name = normalize_name(name)
+    project_name = normalize_name(name)
     project_path = normalize_project_path(Map.get(attrs, :project_path, "."), repo_root)
 
     with {:ok, app_uuid} <- fetch_required(attrs, :app_uuid, env),
-         :ok <- validate_project_path(project_path, repo_root, app_name) do
+         :ok <- validate_project_path(project_path, repo_root, project_name) do
       public_base_url =
         attrs
         |> Map.get(:public_base_url)
@@ -111,7 +186,7 @@ defmodule CoolifyEx.Config do
 
       {:ok,
        %App{
-         name: app_name,
+         name: project_name,
          app_uuid: app_uuid,
          git_branch: Map.get(attrs, :git_branch, "main"),
          git_remote: Map.get(attrs, :git_remote, "origin"),
@@ -152,6 +227,10 @@ defmodule CoolifyEx.Config do
 
   defp normalize_project_path(path, repo_root) do
     Path.relative_to(Path.expand(path, repo_root), repo_root)
+  end
+
+  defp project_entries(manifest) do
+    Map.get(manifest, :projects, Map.get(manifest, :apps))
   end
 
   defp validate_project_path(project_path, repo_root, app_name) do

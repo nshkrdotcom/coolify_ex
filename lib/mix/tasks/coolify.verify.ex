@@ -7,19 +7,20 @@ defmodule Mix.Tasks.Coolify.Verify do
   alias CoolifyEx.Verifier
 
   @moduledoc """
-  Runs smoke checks defined in `coolify.exs`.
+  Runs smoke checks defined in the deployment manifest.
 
       mix coolify.verify
-      mix coolify.verify --app web
+      mix coolify.verify --project web
   """
 
   @impl Mix.Task
   def run(args) do
-    {opts, _argv, _invalid} = OptionParser.parse(args, strict: [app: :string, config: :string])
+    {opts, _argv, _invalid} =
+      OptionParser.parse(args, strict: [project: :string, app: :string, config: :string])
 
-    case Config.load(Keyword.get(opts, :config, "coolify.exs")) do
+    case Config.load(Keyword.get(opts, :config)) do
       {:ok, config} ->
-        run_verification(config, Keyword.get(opts, :app))
+        run_verification(config, Keyword.get(opts, :project) || Keyword.get(opts, :app))
 
       {:error, reason} ->
         Mix.raise("Could not load config: #{inspect(reason)}")

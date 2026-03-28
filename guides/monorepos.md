@@ -9,8 +9,8 @@ For a normal repository with a single application at the root:
 
 ```elixir
 %{
-  default_app: :web,
-  apps: %{
+  default_project: :web,
+  projects: %{
     web: %{
       app_uuid: {:env, "COOLIFY_WEB_APP_UUID"},
       project_path: ".",
@@ -27,8 +27,8 @@ For a repository with multiple deployable applications:
 
 ```elixir
 %{
-  default_app: :web,
-  apps: %{
+  default_project: :web,
+  projects: %{
     web: %{
       app_uuid: {:env, "COOLIFY_WEB_APP_UUID"},
       project_path: "apps/web",
@@ -47,10 +47,10 @@ For a repository with multiple deployable applications:
 
 ## How This Works
 
-- one manifest can define many Coolify applications
+- one manifest can define many Coolify projects
 - each entry has its own UUID, public URL, and smoke checks
 - Git still pushes once from the repository root
-- verification runs against the app you selected with `--app`
+- verification runs against the project you selected with `--project`
 
 ## Phoenix-Specific Advice
 

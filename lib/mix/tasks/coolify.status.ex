@@ -10,7 +10,7 @@ defmodule Mix.Tasks.Coolify.Status do
   Fetches a deployment by UUID.
 
       mix coolify.status DEPLOYMENT_UUID
-      mix coolify.status DEPLOYMENT_UUID --config config/coolify.exs
+      mix coolify.status DEPLOYMENT_UUID --config .coolify_ex.exs
   """
 
   @impl Mix.Task
@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Coolify.Status do
 
     case argv do
       [deployment_uuid] ->
-        case Config.load(Keyword.get(opts, :config, "coolify.exs")) do
+        case Config.load(Keyword.get(opts, :config)) do
           {:ok, config} -> fetch_and_print_status(config, deployment_uuid)
           {:error, reason} -> Mix.raise("Could not fetch deployment status: #{inspect(reason)}")
         end
