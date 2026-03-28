@@ -1,0 +1,80 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="24" y1="18" x2="176" y2="182" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0F172A"/>
+      <stop offset="0.55" stop-color="#13253F"/>
+      <stop offset="1" stop-color="#0B1020"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="38" y1="34" x2="162" y2="166" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#102847"/>
+      <stop offset="0.5" stop-color="#143B63"/>
+      <stop offset="1" stop-color="#0F223E"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="54" y1="40" x2="146" y2="160" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7DD3FC"/>
+      <stop offset="0.45" stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <linearGradient id="coreFill" x1="100" y1="46" x2="100" y2="154" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7DD3FC" stop-opacity="0.92"/>
+      <stop offset="0.5" stop-color="#38BDF8" stop-opacity="0.68"/>
+      <stop offset="1" stop-color="#22C55E" stop-opacity="0.75"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(100 100) rotate(90) scale(90)">
+      <stop offset="0" stop-color="#93C5FD" stop-opacity="0.35"/>
+      <stop offset="0.65" stop-color="#60A5FA" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#60A5FA" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(30 100 100)">
+      <path d="M18 0H0V18" stroke="#7DD3FC" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+    <clipPath id="hexClip">
+      <polygon points="100,12 174,56 174,144 100,188 26,144 26,56"/>
+    </clipPath>
+    <filter id="shadow" x="12" y="8" width="176" height="184" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#020617" flood-opacity="0.45"/>
+    </filter>
+    <filter id="softGlow" x="40" y="34" width="120" height="132" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.65 0"/>
+    </filter>
+    <path id="arm" d="M100 50L114 76L100 102L86 76L100 50Z" />
+    <path id="armDetail" d="M100 56L109 76L100 92L91 76L100 56Z" />
+  </defs>
+
+  <rect width="200" height="200" rx="32" fill="url(#bg)"/>
+  <g clip-path="url(#hexClip)">
+    <rect x="18" y="18" width="164" height="164" fill="url(#grid)"/>
+    <circle cx="100" cy="100" r="88" fill="url(#glow)"/>
+    <path d="M28 56L100 100L172 56" stroke="#93C5FD" stroke-opacity="0.12" stroke-width="1.5"/>
+    <path d="M28 144L100 100L172 144" stroke="#86EFAC" stroke-opacity="0.12" stroke-width="1.5"/>
+    <path d="M100 12V188" stroke="#E2E8F0" stroke-opacity="0.08" stroke-width="1.5"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <polygon points="100,14 172,56 172,144 100,186 28,144 28,56" fill="url(#panel)" stroke="#93C5FD" stroke-opacity="0.3" stroke-width="2"/>
+    <polygon points="100,28 160,63 160,137 100,172 40,137 40,63" fill="none" stroke="url(#edge)" stroke-opacity="0.5" stroke-width="1.5"/>
+  </g>
+
+  <g filter="url(#softGlow)">
+    <circle cx="100" cy="100" r="36" fill="#38BDF8" fill-opacity="0.2"/>
+  </g>
+
+  <g>
+    <use href="#arm" fill="url(#coreFill)"/>
+    <use href="#armDetail" fill="#E0F2FE" fill-opacity="0.6"/>
+    <use href="#arm" transform="rotate(60 100 100)" fill="url(#coreFill)"/>
+    <use href="#armDetail" transform="rotate(60 100 100)" fill="#E0F2FE" fill-opacity="0.55"/>
+    <use href="#arm" transform="rotate(120 100 100)" fill="url(#coreFill)"/>
+    <use href="#armDetail" transform="rotate(120 100 100)" fill="#E0F2FE" fill-opacity="0.5"/>
+    <use href="#arm" transform="rotate(180 100 100)" fill="url(#coreFill)"/>
+    <use href="#armDetail" transform="rotate(180 100 100)" fill="#E0F2FE" fill-opacity="0.55"/>
+    <use href="#arm" transform="rotate(240 100 100)" fill="url(#coreFill)"/>
+    <use href="#armDetail" transform="rotate(240 100 100)" fill="#E0F2FE" fill-opacity="0.5"/>
+    <use href="#arm" transform="rotate(300 100 100)" fill="url(#coreFill)"/>
+    <use href="#armDetail" transform="rotate(300 100 100)" fill="#E0F2FE" fill-opacity="0.55"/>
+    <polygon points="100,74 122,87 122,113 100,126 78,113 78,87" fill="#0B1324" stroke="#E0F2FE" stroke-opacity="0.5" stroke-width="1.5"/>
+    <polygon points="100,81 116,90.5 116,109.5 100,119 84,109.5 84,90.5" fill="none" stroke="#86EFAC" stroke-opacity="0.75" stroke-width="1.5"/>
+    <circle cx="100" cy="100" r="4.5" fill="#F8FAFC"/>
+  </g>
+</svg>
