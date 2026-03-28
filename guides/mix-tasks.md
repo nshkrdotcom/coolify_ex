@@ -1,28 +1,28 @@
 # Mix Tasks
 
-This guide documents the six Mix tasks that ship with `CoolifyEx`, including every accepted flag, the exact success output shape, and the task-specific failure behavior.
+This guide documents the eight Mix tasks that ship with `CoolifyEx`, including
+the flags that matter operationally, the success output shape, and the
+important failure cases.
 
 ## `mix coolify.setup`
 
-Prints a local or remote-server onboarding checklist and tries to load the manifest.
+Prints a local or remote-server onboarding checklist and tries to load the
+manifest.
 
 ### Flags
 
-| Field / Flag | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| `--config` | string | `nil` | no | Explicit manifest path. When omitted, the loader uses parent-directory discovery. |
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--config` | string | discovered | Explicit manifest path. |
 
-### Usage Examples
+### Usage
 
 ```bash
 mix coolify.setup
 mix coolify.setup --config .coolify_ex.exs
-mix coolify.setup --config deploy/.coolify_ex.exs # replace this
 ```
 
-These examples run the checklist with discovery, with the default file name, and with an explicit custom manifest path.
-
-### What It Prints On Success
+### Success Output
 
 ```text
 CoolifyEx remote setup
@@ -35,287 +35,284 @@ base url: https://coolify.example.com
 projects: web
 env COOLIFY_BASE_URL: set
 env COOLIFY_TOKEN: set
-
-Next steps:
-1. Edit .coolify_ex.exs with your project UUIDs, branches, and smoke checks.
-2. Export COOLIFY_BASE_URL and COOLIFY_TOKEN on this server.
-3. Run mix coolify.deploy to push, deploy, and verify.
 ```
-
-This is the actual output shape from a successful `mix coolify.setup` run.
-
-### What It Raises
-
-- No manifest-related exception is raised by the task itself. If manifest loading fails for any reason, the task prints either `manifest: missing or invalid (looked for ...)` or `manifest: missing or invalid (expected ABSOLUTE_PATH)` and continues printing the checklist.
-- The task explicitly checks only whether `git`, `curl`, and `mix` exist on `PATH`, whether the manifest loads, and whether `COOLIFY_BASE_URL` and `COOLIFY_TOKEN` are set.
 
 ## `mix coolify.deploy`
 
-Optionally pushes Git, starts a Coolify deployment, waits for completion, and then optionally runs smoke checks.
+Pushes Git if needed, starts a deployment, waits for completion, and optionally
+verifies smoke checks.
 
 ### Flags
 
-| Field / Flag | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| `--project` | string | `nil` | no | Project to deploy. Uses `default_project` when omitted. |
-| `--config` | string | `nil` | no | Explicit manifest path. |
-| `--force` | boolean | `false` | no | Passes `force: true` to the Coolify start-deployment request. |
-| `--instant` | boolean | `false` | no | Passes `instant: true`, which becomes `instant_deploy=true` in the Coolify API request. |
-| `--no-push` | boolean | `false` | no | Skips `git push`. |
-| `--poll-interval` | integer | `3_000` | no | Milliseconds to sleep between status polls. |
-| `--skip-verify` | boolean | `false` | no | Skips the smoke-check phase after a successful deployment. |
-| `--timeout` | integer | `900_000` | no | Maximum time in milliseconds to wait for a terminal deployment state. |
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--project` | string | `default_project` | Manifest project to deploy. |
+| `--app` | string | `nil` | Alias for `--project`. |
+| `--config` | string | discovered | Explicit manifest path. |
+| `--force` | boolean | `false` | Pass `force=true` to Coolify. |
+| `--instant` | boolean | `false` | Pass `instant_deploy=true` to Coolify. |
+| `--no-push` | boolean | `false` | Skip `git push`. |
+| `--poll-interval` | integer | `3000` | Milliseconds between deployment polls. |
+| `--skip-verify` | boolean | `false` | Skip smoke checks after deploy. |
+| `--timeout` | integer | `900000` | Maximum deploy wait time in milliseconds. |
 
-### Usage Examples
+### Usage
 
 ```bash
 mix coolify.deploy
 mix coolify.deploy --project web
 mix coolify.deploy --project api --no-push --force --instant
-mix coolify.deploy --config deploy/.coolify_ex.exs --timeout 1200000 --poll-interval 5000 # replace this
 ```
 
-These cover the default project, an explicit project, a deploy with push disabled plus Coolify force/instant flags, and a run with a custom config path and custom polling settings.
-
-### What It Prints On Success
+### Success Output
 
 ```text
 Deployment finished: dep-123
 Verification passed: 2/2 checks
 ```
 
-The first line is always printed after a successful deployment; the second line appears only when verification is enabled and all smoke checks pass.
+## `mix coolify.deployments`
 
-### What It Raises
+Lists recent deployments for a manifest project or a direct app UUID.
 
-- Config load failure: `** (Mix) Coolify deploy failed: {:missing_required_value, :token}` and similar `inspect(reason)` output for manifest errors such as `:projects_not_configured`, `{:manifest_not_found, ...}`, `{:project_path_not_found, ...}`, `{:unknown_project, ...}`, or `:default_project_not_configured`.
-- Deployment failure: `** (Mix) Deployment failed with status failed: DEPLOYMENT_UUID` and the same pattern for terminal statuses such as `canceled`, `cancelled`, or `error`.
-- Deployment timeout: `** (Mix) Deployment timed out while waiting for DEPLOYMENT_UUID`.
-- Verification failure after a successful deployment: `** (Mix) Verification failed with N failing checks`.
+### Flags
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--project` | string | `default_project` | Manifest project to inspect. |
+| `--app-uuid` | string | `nil` | Direct Coolify app UUID. |
+| `--app` | string | `nil` | Alias for `--app-uuid`. |
+| `--config` | string | discovered | Explicit manifest path. |
+| `--take` | integer | `1` | Number of deployments to fetch. |
+| `--skip` | integer | `0` | Number of deployments to skip. |
+| `--json` | boolean | `false` | Print machine-readable JSON. |
+
+### Usage
+
+```bash
+mix coolify.deployments --project web
+mix coolify.deployments --project web --take 5
+mix coolify.deployments --app-uuid app-123 --json
+```
+
+### Human Output
+
+```text
+Project: web
+dep-123 | finished | abc123 | 2026-03-28T07:42:19Z | 2026-03-28T07:44:02Z | Add deployment lookup
+```
+
+### JSON Output
+
+```json
+{
+  "project": "web",
+  "app_uuid": "app-123",
+  "deployments": [
+    {
+      "uuid": "dep-123",
+      "status": "finished",
+      "commit": "abc123",
+      "commit_message": "Add deployment lookup",
+      "created_at": "2026-03-28T07:42:19Z",
+      "finished_at": "2026-03-28T07:44:02Z",
+      "deployment_url": null,
+      "logs": []
+    }
+  ]
+}
+```
+
+## `mix coolify.latest`
+
+Fetches the newest deployment for a manifest project or a direct app UUID.
+
+### Flags
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--project` | string | `default_project` | Manifest project to inspect. |
+| `--app-uuid` | string | `nil` | Direct Coolify app UUID. |
+| `--app` | string | `nil` | Alias for `--app-uuid`. |
+| `--config` | string | discovered | Explicit manifest path. |
+| `--json` | boolean | `false` | Print machine-readable JSON. |
+
+### Usage
+
+```bash
+mix coolify.latest --project web
+mix coolify.latest --project web --json
+```
+
+### Human Output
+
+```text
+Project: web
+App UUID: app-123
+Latest deployment: dep-123
+Status: finished
+Commit: abc123
+Created at: 2026-03-28T07:42:19Z
+Finished at: 2026-03-28T07:44:02Z
+Commit message: Add deployment lookup
+```
 
 ## `mix coolify.status`
 
-Fetches one deployment by UUID and prints the current status plus the Coolify logs URL when Coolify supplies one.
+Fetches one deployment by UUID, or resolves the latest deployment for a project
+first.
 
 ### Flags
 
-| Field / Flag | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| `--config` | string | `nil` | no | Explicit manifest path. |
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--project` | string | `nil` | Manifest project to inspect when combined with `--latest`. |
+| `--app-uuid` | string | `nil` | Direct app UUID when combined with `--latest`. |
+| `--app` | string | `nil` | Alias for `--app-uuid`. |
+| `--config` | string | discovered | Explicit manifest path. |
+| `--latest` | boolean | `false` | Resolve latest deployment first. |
 
-### Usage Examples
+### Usage
 
 ```bash
-mix coolify.status DEPLOYMENT_UUID # replace this
-mix coolify.status DEPLOYMENT_UUID --config .coolify_ex.exs # replace this
-mix coolify.status DEPLOYMENT_UUID --config deploy/.coolify_ex.exs # replace this
+mix coolify.status DEPLOYMENT_UUID
+mix coolify.status --project web --latest
 ```
 
-These fetch status with discovery, with the default manifest path, and with an explicit custom manifest path.
-
-### What It Prints On Success
+### Human Output
 
 ```text
+Project: web
+Latest deployment: dep-123
 Status: finished
+Commit: abc123
+Created at: 2026-03-28T07:42:19Z
+Finished at: 2026-03-28T07:44:02Z
+Commit message: Add deployment lookup
 Logs: /project/demo/deployment/dep-123
 ```
 
-The `Logs:` line is printed only when the deployment has a non-`nil` `deployment_url`.
-
-### What It Raises
-
-- Missing positional argument: `** (Mix) Usage: mix coolify.status DEPLOYMENT_UUID [--config path]`.
-- Config load failure: `** (Mix) Could not fetch deployment status: {:manifest_not_found, ...}` or another `inspect(reason)` value from `CoolifyEx.Config.load/2`.
-- Coolify fetch failure: `** (Mix) Could not fetch deployment status: REASON`.
-
 ## `mix coolify.logs`
 
-Fetches one deployment by UUID and prints each normalized log line.
+Fetches one deployment log by UUID, or resolves the latest deployment for a
+project first.
 
 ### Flags
 
-| Field / Flag | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| `--config` | string | `nil` | no | Explicit manifest path. |
-| `--tail` | integer | `100` | no | Number of lines from the end of the log list to print. |
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--project` | string | `nil` | Manifest project to inspect when combined with `--latest`. |
+| `--app-uuid` | string | `nil` | Direct app UUID when combined with `--latest`. |
+| `--app` | string | `nil` | Alias for `--app-uuid`. |
+| `--config` | string | discovered | Explicit manifest path. |
+| `--latest` | boolean | `false` | Resolve latest deployment first. |
+| `--tail` | integer | `100` | Number of lines from the end of the deployment log. |
 
-### Usage Examples
+### Usage
 
 ```bash
-mix coolify.logs DEPLOYMENT_UUID # replace this
-mix coolify.logs DEPLOYMENT_UUID --tail 50 # replace this
-mix coolify.logs DEPLOYMENT_UUID --tail 0 --config .coolify_ex.exs # replace this
+mix coolify.logs DEPLOYMENT_UUID
+mix coolify.logs --project web --latest --tail 200
 ```
 
-These fetch the default tail length, a shorter tail, and all lines from a specific manifest path.
-
-### What It Prints On Success
+### Human Output
 
 ```text
-[2026-03-27T00:00:00Z] done
-build complete
+[2026-03-28T07:42:19Z] build start
+[2026-03-28T07:44:02Z] build done
 ```
-
-Each line is printed as `[timestamp] output` when a timestamp exists, or as just `output` when it does not.
-
-### What It Raises
-
-- Missing positional argument: `** (Mix) Usage: mix coolify.logs DEPLOYMENT_UUID [--config path] [--tail 100]`.
-- Config load failure: `** (Mix) Could not fetch deployment logs: {:manifest_not_found, ...}` or another `inspect(reason)` value from `CoolifyEx.Config.load/2`.
-- Coolify fetch failure: `** (Mix) Could not fetch deployment logs: REASON`.
 
 ## `mix coolify.app_logs`
 
-Fetches runtime logs for one configured Coolify app by resolving the manifest project to its `app_uuid`.
+Fetches runtime logs for the running application by resolving a manifest
+project to its `app_uuid`.
 
 ### Flags
 
-| Field / Flag | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| `--project` | string | `nil` | no | Project to fetch logs for. Uses `default_project` when omitted. |
-| `--app` | string | `nil` | no | Alias for `--project`. |
-| `--config` | string | `nil` | no | Explicit manifest path. |
-| `--lines` | integer | `100` | no | Number of runtime log lines to request from Coolify. |
-| `--follow` | boolean | `false` | no | Poll the application-logs endpoint continuously and print only newly observed lines. |
-| `--poll-interval` | integer | `2_000` | no | Milliseconds to sleep between polls when `--follow` is enabled. |
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--project` | string | `default_project` | Manifest project to inspect. |
+| `--app` | string | `nil` | Alias for `--project`. |
+| `--config` | string | discovered | Explicit manifest path. |
+| `--lines` | integer | `100` | Number of runtime log lines to request. |
+| `--follow` | boolean | `false` | Poll continuously and print only new lines. |
+| `--poll-interval` | integer | `2000` | Milliseconds between follow polls. |
 
-### Usage Examples
+### Usage
 
 ```bash
-mix coolify.app_logs
 mix coolify.app_logs --project web --lines 200
 mix coolify.app_logs --project web --lines 200 --follow
-mix coolify.app_logs --project api --config deploy/.coolify_ex.exs --poll-interval 5000 # replace this
 ```
-
-These cover the default project, a larger runtime log tail, a continuously polled runtime stream, and a non-default project from a custom manifest path.
-
-### What It Prints On Success
-
-```text
-booted
-handled request
-channel joined
-```
-
-Each runtime line is printed exactly once per observed line when you use `--follow`, based on overlap between the previously fetched tail and the current tail returned by Coolify.
-
-### What It Raises
-
-- Config load failure: `** (Mix) Could not load config: {:manifest_not_found, ...}` or another `inspect(reason)` value from `CoolifyEx.Config.load/2`.
-- Project selection failure: `** (Mix) Could not fetch application logs: {:unknown_project, "missing"}` or `** (Mix) Could not fetch application logs: :default_project_not_configured`.
-- Invalid `--lines`: `** (ArgumentError) application log lines must be a positive integer, got: ...`.
-- Invalid `--poll-interval`: `** (ArgumentError) application log poll interval must be a non-negative integer, got: ...`.
-- Coolify fetch failure: `** (Mix) Could not fetch application logs: REASON`.
 
 ## `mix coolify.verify`
 
-Runs the configured smoke checks without triggering a new deployment.
+Runs smoke checks from the manifest without starting a new deployment.
 
 ### Flags
 
-| Field / Flag | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| `--project` | string | `nil` | no | Project to verify. Uses `default_project` when omitted. |
-| `--config` | string | `nil` | no | Explicit manifest path. |
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--project` | string | `default_project` | Manifest project to verify. |
+| `--app` | string | `nil` | Alias for `--project`. |
+| `--config` | string | discovered | Explicit manifest path. |
 
-### Usage Examples
+### Usage
 
 ```bash
 mix coolify.verify
 mix coolify.verify --project web
-mix coolify.verify --project web --config .coolify_ex.exs
 ```
 
-These verify the default project, an explicit project, and an explicit project with an explicit manifest path.
+## Common Failure Cases
 
-### What It Prints On Success
+- `No deployments found for project web`
+  This means the app lookup succeeded but Coolify returned an empty deployment
+  history.
 
-```text
-All 2 checks passed for web
-```
+- `Could not fetch deployments: 401 unauthorized`
+  This means Coolify returned an HTTP error response, usually because the token
+  is missing or invalid.
 
-This is the exact success line from the task when every smoke check passes.
+- `Project web does not define an app_uuid`
+  This is the explicit task-level error when project resolution succeeds but no
+  target app UUID is available.
 
-### What It Raises
+- `Usage: mix coolify.status DEPLOYMENT_UUID ...`
+  This means you did not provide either a deployment UUID or `--latest`.
 
-- Config load failure: `** (Mix) Could not load config: {:missing_required_value, :token}` and similar `inspect(reason)` output for other manifest load failures.
-- Project selection failure: `** (Mix) Could not verify app: {:unknown_project, "missing"}` or `** (Mix) Could not verify app: :default_project_not_configured`.
-- Smoke-check failure: the task first prints one line per failing check such as `Health: expected HTTP 200, got 500`, then raises `** (Mix) Verification failed for web`.
-- Relative smoke-check path with no `public_base_url`: `** (ArgumentError) scheme is required for url: /healthz`.
+## Structs
 
-## Deployment And Runtime Log Structs
+`CoolifyEx.Deployment` includes:
 
-`mix coolify.deploy`, `mix coolify.status`, `mix coolify.logs`, and `mix coolify.app_logs` all work with normalized deployment and runtime-log structs returned by `CoolifyEx.Client` or `CoolifyEx.ApplicationLogs`.
+| Field | Type | Description |
+| --- | --- | --- |
+| `uuid` | string | Deployment UUID. |
+| `status` | string or `nil` | Coolify deployment status. |
+| `commit` | string or `nil` | Commit SHA or other revision identifier. |
+| `commit_message` | string or `nil` | Commit message when Coolify returns it. |
+| `created_at` | string or `nil` | Deployment creation timestamp. |
+| `finished_at` | string or `nil` | Deployment completion timestamp. |
+| `deployment_url` | string or `nil` | Coolify logs/details URL. |
+| `logs` | list of `CoolifyEx.LogLine` | Normalized deployment log lines. |
 
-`CoolifyEx.Deployment`:
+`CoolifyEx.ApplicationLogs` includes:
 
-| Field / Flag | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| `uuid` | string | none | yes | Deployment UUID returned by Coolify. |
-| `status` | string or `nil` | `nil` | no | Deployment status fetched from Coolify. |
-| `deployment_url` | string or `nil` | `nil` | no | Coolify URL for the deployment details page; the status task prints it as `Logs:` when present. |
-| `commit` | string or `nil` | `nil` | no | Commit identifier returned by Coolify, when present. |
-| `logs` | list of `CoolifyEx.LogLine` | `[]` | no | Normalized deployment log lines. |
+| Field | Type | Description |
+| --- | --- | --- |
+| `app_name` | string or `nil` | Manifest project name when resolved. |
+| `app_uuid` | string | Coolify application UUID. |
+| `raw` | string or `nil` | Raw body returned by Coolify. |
+| `logs` | list of `CoolifyEx.LogLine` | Runtime log lines. |
 
-`CoolifyEx.LogLine`:
-
-| Field / Flag | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| `timestamp` | string or `nil` | `nil` | no | Timestamp from Coolify, if provided. |
-| `output` | string | none | yes | Log line body that `mix coolify.logs` prints. |
-
-`CoolifyEx.ApplicationLogs`:
-
-| Field / Flag | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| `app_name` | string or `nil` | `nil` | no | Manifest project name when the high-level fetch API resolved one. |
-| `app_uuid` | string | none | yes | Coolify application UUID used for the runtime log request. |
-| `raw` | string or `nil` | `nil` | no | Raw log body returned by Coolify before line splitting. |
-| `logs` | list of `CoolifyEx.LogLine` | `[]` | no | Runtime log lines derived from the raw application log string. |
-
-## Composing Tasks
-
-Standard deploy-and-verify flow:
+## Canonical Operator Flow
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-cd /srv/coolify/my-app # replace this
-git pull --ff-only
-mix deps.get
-# replace this project name if your manifest uses a different key
-mix coolify.deploy --config .coolify_ex.exs --project web
+mix coolify.deploy --project web
+mix coolify.latest --project web
+mix coolify.logs --project web --latest --tail 200
+mix coolify.app_logs --project web --lines 200 --follow
 ```
 
-This script updates the checkout, installs dependencies, and then lets `mix coolify.deploy` handle the deployment and built-in smoke checks.
-
-Deploy-only flow with manual log inspection afterward:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-cd /srv/coolify/my-app # replace this
-git pull --ff-only
-
-# replace this project name if your manifest uses a different key
-output=$(mix coolify.deploy --config .coolify_ex.exs --project web --skip-verify --no-push)
-printf '%s\n' "$output"
-
-deployment_uuid=$(printf '%s\n' "$output" | sed -n 's/^Deployment finished: //p' | tail -n 1)
-
-mix coolify.status "$deployment_uuid" --config .coolify_ex.exs
-mix coolify.logs "$deployment_uuid" --config .coolify_ex.exs --tail 200
-mix coolify.app_logs --config .coolify_ex.exs --project web --lines 200
-```
-
-This script captures the deployment UUID from the task output and then uses the status, deployment-log, and runtime-log tasks for manual inspection.
-
-## See Also
-
-- [guides/getting-started.md](getting-started.md) when you want the first end-to-end deploy flow rather than the raw CLI reference.
-- [guides/manifest.md](manifest.md) when you need to understand how `--config` interacts with discovery, env tuples, and project selection.
-- [guides/monorepos.md](monorepos.md) when you want to combine these tasks with multiple project entries in one repository.
-- [guides/remote-server.md](remote-server.md) when you want to wrap these tasks in remote-host workflows, cron, or systemd.
+Use `mix coolify.logs` for deployment/build logs and `mix coolify.app_logs` for
+runtime application logs. They are not the same surface.

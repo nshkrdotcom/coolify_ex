@@ -4,7 +4,7 @@ defmodule CoolifyEx.MixProject do
   def project do
     [
       app: :coolify_ex,
-      version: "0.2.0",
+      version: "0.3.0",
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,

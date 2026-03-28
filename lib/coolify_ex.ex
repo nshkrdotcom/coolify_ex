@@ -8,10 +8,11 @@ defmodule CoolifyEx do
   - it supports top-level Mix applications and monorepos
   - it treats Coolify as an external deployment target driven by a local manifest
 
-  The public API centers around three workflows:
+  The public API centers around four workflows:
 
   - loading a manifest with `CoolifyEx.Config.load/1`
   - deploying with `CoolifyEx.Deployer.deploy/3`
+  - listing deployments and resolving the latest deployment for an app
   - fetching runtime application logs with `CoolifyEx.ApplicationLogs.fetch/3`
   - verifying a live app with `CoolifyEx.Verifier.verify/3`
   """
@@ -19,6 +20,7 @@ defmodule CoolifyEx do
   alias CoolifyEx.ApplicationLogs
   alias CoolifyEx.Config
   alias CoolifyEx.Deployer
+  alias CoolifyEx.Deployments
   alias CoolifyEx.Verifier
 
   @spec load_config(Path.t() | nil, keyword()) :: {:ok, Config.t()} | {:error, term()}
@@ -30,6 +32,18 @@ defmodule CoolifyEx do
           {:ok, CoolifyEx.Deployment.t()} | {:error, term()}
   def deploy(%Config{} = config, app_name, opts \\ []) do
     Deployer.deploy(config, app_name, opts)
+  end
+
+  @spec list_application_deployments(Config.t(), String.t() | atom() | nil, keyword()) ::
+          {:ok, [CoolifyEx.Deployment.t()]} | {:error, term()}
+  def list_application_deployments(%Config{} = config, project_or_app \\ nil, opts \\ []) do
+    Deployments.list(config, project_or_app, opts)
+  end
+
+  @spec fetch_latest_application_deployment(Config.t(), String.t() | atom() | nil, keyword()) ::
+          {:ok, CoolifyEx.Deployment.t()} | {:error, term()}
+  def fetch_latest_application_deployment(%Config{} = config, project_or_app \\ nil, opts \\ []) do
+    Deployments.fetch_latest(config, project_or_app, opts)
   end
 
   @spec fetch_application_logs(Config.t(), String.t() | atom() | nil, keyword()) ::
