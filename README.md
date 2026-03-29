@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nshkrdotcom/coolify_ex"><img src="https://img.shields.io/badge/release-0.3.0-0f766e.svg" alt="Release 0.3.0" /></a>
+  <a href="https://hex.pm/packages/coolify_ex"><img src="https://img.shields.io/hexpm/v/coolify_ex.svg" alt="Hex.pm Version" /></a>
   <a href="https://hexdocs.pm/coolify_ex/"><img src="https://img.shields.io/badge/docs-hexdocs-2563eb.svg" alt="HexDocs" /></a>
   <a href="https://github.com/nshkrdotcom/coolify_ex"><img src="https://img.shields.io/badge/license-MIT-111827.svg" alt="MIT License" /></a>
   <a href="https://github.com/nshkrdotcom/coolify_ex"><img src="https://img.shields.io/badge/github-nshkrdotcom%2Fcoolify__ex-24292f?style=flat&logo=github" alt="GitHub" /></a>
