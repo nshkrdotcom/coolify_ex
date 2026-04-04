@@ -213,7 +213,8 @@ defmodule CoolifyEx.Client do
 
   defp normalize_deployment(body, uuid_override \\ nil) do
     %Deployment{
-      uuid: deployment_field(body, :uuid, uuid_override),
+      uuid:
+        deployment_field(body, :uuid, deployment_field(body, :deployment_uuid, uuid_override)),
       status: deployment_field(body, :status),
       deployment_url: deployment_field(body, :deployment_url),
       commit: deployment_field(body, :commit),

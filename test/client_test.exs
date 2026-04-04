@@ -170,4 +170,17 @@ defmodule CoolifyEx.ClientTest do
     assert {:error, {:http_error, 401, %{"message" => "unauthorized"}}} =
              Client.list_application_deployments(base_url, "token-123", "app-123")
   end
+
+  test "normalizes latest deployments from deployment_uuid field", %{
+    base_url: base_url,
+    bypass: bypass
+  } do
+    Bypass.expect_once(bypass, "GET", "/api/v1/deployments/applications/app-123", fn conn ->
+      assert conn.query_string == "take=1"
+      Plug.Conn.resp(conn, 200, ~s([{"deployment_uuid":"dep-456","status":"finished"}]))
+    end)
+
+    assert {:ok, %Deployment{uuid: "dep-456", status: "finished"}} =
+             Client.fetch_latest_application_deployment(base_url, "token-123", "app-123")
+  end
 end
