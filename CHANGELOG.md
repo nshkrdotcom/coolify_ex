@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-04
+
+### Fixed
+
+- Normalize latest-deployment responses that return `deployment_uuid`
+  instead of `uuid`.
+- Fix `CoolifyEx.fetch_latest_application_deployment/3` for Coolify payloads
+  that only expose `deployment_uuid`.
+- Fix `mix coolify.status --latest` when the latest deployment lookup returns
+  `deployment_uuid` fields.
+
+### Changed
+
+- Replace the static README release badge with a live Hex.pm version badge.
+- Refresh installation snippets and getting-started examples for the current
+  `0.4.x` release line.
+
 ## [0.3.0] - 2026-03-28
 
 ### Added

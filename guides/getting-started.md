@@ -2,7 +2,7 @@
 
 ## What This Guide Covers
 
-This guide walks through the first end-to-end `CoolifyEx` deployment from a trusted workstation or remote server.
+This guide walks through the first end-to-end `CoolifyEx 0.4.0` deployment from a trusted workstation or remote server.
 
 ## Prerequisites
 
@@ -49,7 +49,7 @@ Add `coolify_ex` to `mix.exs`:
 ```elixir
 def deps do
   [
-    {:coolify_ex, "~> 0.3.0", runtime: false}
+    {:coolify_ex, "~> 0.4.0", runtime: false}
   ]
 end
 ```

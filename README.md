@@ -66,7 +66,7 @@ Add `coolify_ex` to your dependencies:
 ```elixir
 def deps do
   [
-    {:coolify_ex, "~> 0.3.0", runtime: false}
+    {:coolify_ex, "~> 0.4.0", runtime: false}
   ]
 end
 ```
@@ -112,7 +112,7 @@ You need one UUID per manifest project entry.
 ```elixir
 def deps do
   [
-    {:coolify_ex, "~> 0.3.0", runtime: false}
+    {:coolify_ex, "~> 0.4.0", runtime: false}
   ]
 end
 ```
