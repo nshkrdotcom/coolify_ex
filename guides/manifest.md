@@ -1,8 +1,8 @@
 # Manifest Format
 
-This guide documents how `CoolifyEx` finds, evaluates, normalizes, and validates the deployment manifest in `0.5.0`.
+This guide documents how `CoolifyEx` finds, evaluates, normalizes, and validates the deployment manifest in `0.5.1`.
 
-The important change in `0.5.0` is that a project no longer exposes one undifferentiated `smoke_checks` list. Each project now defines:
+The important `0.5.x` change is that a project no longer exposes one undifferentiated `smoke_checks` list. Each project now defines:
 
 - a required `readiness` section
 - an optional `verification` section
@@ -188,6 +188,8 @@ That last case is legal at load time but will fail at request time because `Req`
 
 1. Poll every readiness check until all of them pass or `timeout_ms` is reached.
 2. Run the verification checks once.
+
+In `0.5.1`, each readiness attempt corresponds to one real HTTP poll. Req transport retries are disabled inside the verifier so attempt counts stay accurate.
 
 The returned `CoolifyEx.Verifier.Result` includes:
 

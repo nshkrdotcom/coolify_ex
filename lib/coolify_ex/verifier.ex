@@ -153,7 +153,7 @@ defmodule CoolifyEx.Verifier do
   end
 
   defp default_request(method, url) do
-    case Req.request(method: method, url: url) do
+    case Req.request(method: method, url: url, retry: false) do
       {:ok, response} -> {:ok, %{status: response.status, body: normalize_body(response.body)}}
       {:error, exception} -> {:error, exception}
     end

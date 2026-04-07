@@ -16,7 +16,7 @@
 - readiness checks answer "is the app actually serving yet?"
 - verification checks answer "did the deployment come up in the state I expect?"
 
-That distinction is the core change in `0.5.0`. Coolify can mark a deployment finished before the public app is ready to answer HTTP traffic. `CoolifyEx` now models that directly instead of treating every post-deploy request as the same kind of check.
+That distinction is the core `0.5.x` change. Coolify can mark a deployment finished before the public app is ready to answer HTTP traffic. `CoolifyEx` models that directly instead of treating every post-deploy request as the same kind of check. In `0.5.1`, transport-level Req retries are explicitly disabled inside verification so the reported readiness attempt count matches real HTTP polls.
 
 ## How It Fits in Your Stack
 
@@ -66,7 +66,7 @@ Add `coolify_ex` to your dependencies:
 ```elixir
 def deps do
   [
-    {:coolify_ex, "~> 0.5.0", runtime: false}
+    {:coolify_ex, "~> 0.5.1", runtime: false}
   ]
 end
 ```
@@ -197,6 +197,7 @@ The same lookup is available from the library API:
 ## Key Behaviors
 
 - Relative readiness and verification URLs are expanded only when the URL starts with `/` and `public_base_url` is a string.
+- Each reported readiness attempt is exactly one HTTP poll. Hidden Req retries are disabled so readiness accounting and logs stay truthful.
 - `mix coolify.deploy --no-push` skips the Git push step but still loads the manifest, starts the deployment, waits for Coolify, and verifies unless you also pass `--skip-verify`.
 - `mix coolify.deployments`, `mix coolify.latest`, `mix coolify.status --latest`, and `mix coolify.logs --latest` all resolve the manifest project to its `app_uuid` before calling Coolify.
 - `mix coolify.app_logs` resolves a manifest project to its `app_uuid` and calls Coolify's application-logs endpoint. `--follow` re-polls that endpoint and prints only newly observed lines.

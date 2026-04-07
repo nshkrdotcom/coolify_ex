@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-04-07
+
+### Fixed
+
+- Disable Req's hidden transport retry behavior inside readiness and
+  verification requests so every `CoolifyEx` readiness attempt corresponds to
+  exactly one real HTTP poll.
+- Fix misleading deploy output where a transient `502` could be retried inside
+  Req and still be reported as `Readiness passed after 1 attempt(s)`.
+- Validate the corrected behavior against the real `jido_hive`
+  `scripts/deploy_coolify.sh --no-push` deploy path before release.
+
 ## [0.5.0] - 2026-04-07
 
 ### Added

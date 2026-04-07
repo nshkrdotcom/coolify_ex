@@ -1,6 +1,9 @@
 defmodule CoolifyEx.VerifierTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
+  alias Bypass
   alias CoolifyEx.Config
   alias CoolifyEx.Config.App
   alias CoolifyEx.HTTPCheck
@@ -89,24 +92,59 @@ defmodule CoolifyEx.VerifierTest do
     assert Enum.any?(result.verification.checks, &(&1.reason == "expected HTTP 200, got 500"))
   end
 
-  defp config do
+  test "default HTTP requests do not hide failed readiness polls behind Req retries" do
+    bypass = Bypass.open()
+    counter = start_supervised!({Agent, fn -> 0 end})
+    config = config("http://localhost:#{bypass.port}")
+
+    Bypass.expect(bypass, "GET", "/healthz", fn conn ->
+      call_number =
+        Agent.get_and_update(counter, fn current ->
+          next = current + 1
+          {next, next}
+        end)
+
+      case call_number do
+        1 -> Plug.Conn.resp(conn, 502, "bad gateway")
+        2 -> Plug.Conn.resp(conn, 200, "healthy")
+      end
+    end)
+
+    Bypass.expect_once(bypass, "GET", "/api/targets", fn conn ->
+      Plug.Conn.resp(conn, 200, ~s({"data":[]}))
+    end)
+
+    log =
+      capture_log(fn ->
+        assert {:ok, result} =
+                 Verifier.verify(config, "web", sleep: fn _ms -> :ok end)
+
+        assert result.readiness.attempts == 2
+        assert result.readiness.duration_ms >= 0
+        assert result.verification.passed == 1
+      end)
+
+    refute log =~ "retry: got response with status 502"
+  end
+
+  defp config(public_base_url \\ "https://app.example.com") do
     app = %App{
       name: "web",
       app_uuid: "app-123",
       git_branch: "main",
       git_remote: "origin",
       project_path: ".",
-      public_base_url: "https://app.example.com",
+      public_base_url: public_base_url,
       readiness_initial_delay_ms: 0,
       readiness_poll_interval_ms: 10,
       readiness_timeout_ms: 100,
       readiness_checks: [
-        %HTTPCheck{name: "Health", url: "https://app.example.com/healthz", expected_status: 200}
+        %HTTPCheck{name: "Health", url: "#{public_base_url}/healthz", expected_status: 200}
       ],
       verification_checks: [
         %HTTPCheck{
           name: "Targets",
-          url: "https://app.example.com/api/targets",
+          url: "#{public_base_url}/api/targets",
           expected_status: 200,
           expected_body_contains: "\"data\""
         }

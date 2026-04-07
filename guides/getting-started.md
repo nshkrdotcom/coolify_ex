@@ -2,9 +2,9 @@
 
 ## What This Guide Covers
 
-This guide walks through the first end-to-end `CoolifyEx 0.5.0` deployment from a trusted workstation or remote server.
+This guide walks through the first end-to-end `CoolifyEx 0.5.1` deployment from a trusted workstation or remote server.
 
-The key idea in `0.5.0` is that deployment verification is now split into two phases:
+The key idea in `0.5.x` is that deployment verification is split into two phases:
 
 - readiness checks: polled until the app is actually serving traffic
 - verification checks: run once after readiness succeeds
@@ -57,7 +57,7 @@ Add `coolify_ex` to `mix.exs`:
 ```elixir
 def deps do
   [
-    {:coolify_ex, "~> 0.5.0", runtime: false}
+    {:coolify_ex, "~> 0.5.1", runtime: false}
   ]
 end
 ```
@@ -172,6 +172,8 @@ This means:
 - Coolify accepted and finished the deployment
 - the live app eventually answered the readiness contract
 - every verification check passed after the app became ready
+
+In `0.5.1`, the readiness attempt count now reflects real HTTP polls rather than hidden transport retries inside Req.
 
 ## Inspect The Result
 

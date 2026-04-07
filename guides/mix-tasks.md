@@ -1,6 +1,6 @@
 # Mix Tasks
 
-This guide documents the Mix tasks that ship with `CoolifyEx 0.5.0`, including the flags that matter operationally, the success output shape, and the important failure cases.
+This guide documents the Mix tasks that ship with `CoolifyEx 0.5.1`, including the flags that matter operationally, the success output shape, and the important failure cases.
 
 ## `mix coolify.setup`
 
@@ -73,6 +73,7 @@ Verification passed: 2/2 checks
 - If Coolify reports a failed deployment status, the task raises before readiness begins.
 - If readiness does not pass before the configured readiness timeout, the task raises `Verification failed during readiness ...`.
 - If readiness passes but verification checks fail, the task raises `Verification failed with N failing checks`.
+- Readiness attempt counts correspond to real HTTP polls. Transport-level retries are not hidden inside one reported attempt.
 
 ## `mix coolify.verify`
 
