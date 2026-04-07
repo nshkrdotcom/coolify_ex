@@ -10,11 +10,25 @@
       git_remote: "origin",
       # Use "." for a top-level app or a relative child path for monorepos.
       project_path: ".",
-      public_base_url: "https://example.com",
-      smoke_checks: [
-        %{name: "Landing page", url: "/", expected_status: 200},
-        %{name: "Health", url: "/healthz", expected_status: 200, expected_body_contains: "ok"}
-      ]
+      public_base_url: {:env, "COOLIFY_PUBLIC_BASE_URL"},
+      readiness: %{
+        initial_delay_ms: 0,
+        poll_interval_ms: 2_000,
+        timeout_ms: 120_000,
+        checks: [
+          %{
+            name: "HTTP ready",
+            url: "/healthz",
+            expected_status: 200,
+            expected_body_contains: "ok"
+          }
+        ]
+      },
+      verification: %{
+        checks: [
+          %{name: "Landing page", url: "/", expected_status: 200}
+        ]
+      }
     }
   }
 }

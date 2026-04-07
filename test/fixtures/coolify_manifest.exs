@@ -9,16 +9,30 @@
       git_branch: "main",
       git_remote: "origin",
       project_path: ".",
-      public_base_url: "https://app.example.com",
-      smoke_checks: [
-        %{name: "Root", url: "/", expected_status: 200},
-        %{
-          name: "Health",
-          url: "/healthz",
-          expected_status: 200,
-          expected_body_contains: "healthy"
-        }
-      ]
+      public_base_url: {:env, "COOLIFY_PUBLIC_BASE_URL"},
+      readiness: %{
+        initial_delay_ms: 1_000,
+        poll_interval_ms: 2_000,
+        timeout_ms: 60_000,
+        checks: [
+          %{
+            name: "Health",
+            url: "/healthz",
+            expected_status: 200,
+            expected_body_contains: "healthy"
+          }
+        ]
+      },
+      verification: %{
+        checks: [
+          %{
+            name: "Targets",
+            url: "/api/targets",
+            expected_status: 200,
+            expected_body_contains: "\"data\""
+          }
+        ]
+      }
     }
   }
 }

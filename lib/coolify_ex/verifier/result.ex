@@ -1,18 +1,16 @@
 defmodule CoolifyEx.Verifier.Result do
   @moduledoc """
-  Aggregate result from smoke-check verification.
+  Aggregate result from readiness waiting plus post-ready verification.
   """
 
-  alias CoolifyEx.Verifier.CheckResult
+  alias CoolifyEx.Verifier.PhaseResult
 
-  @enforce_keys [:app, :checks]
-  defstruct [:app, :total, :passed, :failed, checks: []]
+  @enforce_keys [:app, :readiness, :verification]
+  defstruct [:app, :readiness, :verification]
 
   @type t :: %__MODULE__{
           app: String.t(),
-          total: non_neg_integer(),
-          passed: non_neg_integer(),
-          failed: non_neg_integer(),
-          checks: [CheckResult.t()]
+          readiness: PhaseResult.t(),
+          verification: PhaseResult.t()
         }
 end

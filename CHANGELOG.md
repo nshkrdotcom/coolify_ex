@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-07
+
+### Added
+
+- Add explicit project-level readiness configuration with `initial_delay_ms`,
+  `poll_interval_ms`, `timeout_ms`, and required readiness checks.
+- Add explicit post-ready verification checks separate from readiness.
+- Add structured verifier phase results for readiness and verification.
+
+### Changed
+
+- Replace the old one-phase `smoke_checks` model with a two-phase
+  readiness-plus-verification workflow.
+- Update `mix coolify.deploy` and `mix coolify.verify` to wait for readiness
+  before verification and to print phase-aware output.
+- Refresh the example manifest, README, and guides for the new `0.5.0`
+  contract.
+
+### Fixed
+
+- Fix transient post-deploy `502` failures caused by verifying the public app
+  before it finished serving traffic.
+
 ## [0.4.0] - 2026-04-04
 
 ### Fixed

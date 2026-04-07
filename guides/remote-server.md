@@ -19,8 +19,6 @@ Keep one working checkout per deployable repository on the server:
 
 This layout keeps the manifest, Git checkout, and Mix tasks together in one predictable location for the deploy user.
 
-If you manage multiple repositories, give each one its own checkout and its own env file instead of sharing a single working tree.
-
 ## Bootstrap
 
 After cloning the repository, run:
@@ -29,8 +27,6 @@ After cloning the repository, run:
 ./scripts/setup_remote.sh
 ```
 
-This checks for `git`, `curl`, and `mix`, copies `coolify.example.exs` to `.coolify_ex.exs` if needed, runs `mix deps.get`, and then runs `mix coolify.setup --config .coolify_ex.exs`.
-
 You can target a different manifest path:
 
 ```bash
@@ -38,7 +34,7 @@ mkdir -p deploy
 ./scripts/setup_remote.sh deploy/.coolify_ex.exs
 ```
 
-This creates the parent directory first and then asks the bootstrap script to use a custom manifest path relative to the repository root.
+The bootstrap script checks for `git`, `curl`, and `mix`, copies `coolify.example.exs` to the manifest path if needed, runs `mix deps.get`, and then runs `mix coolify.setup`.
 
 ## Secrets Management
 
@@ -49,12 +45,15 @@ Prefer environment variables over literal secrets in the manifest:
   base_url: {:env, "COOLIFY_BASE_URL"},
   token: {:env, "COOLIFY_TOKEN"},
   projects: %{
-    web: %{app_uuid: {:env, "COOLIFY_WEB_APP_UUID"}, project_path: "."}
+    web: %{
+      app_uuid: {:env, "COOLIFY_WEB_APP_UUID"},
+      public_base_url: {:env, "COOLIFY_PUBLIC_BASE_URL"},
+      project_path: ".",
+      readiness: %{checks: [%{name: "HTTP ready", url: "/healthz", expected_status: 200}]}
+    }
   }
 }
 ```
-
-This keeps the manifest safe to commit because the actual secrets live outside the repository.
 
 One common pattern is a sourced env file owned by the deploy user:
 
@@ -62,9 +61,8 @@ One common pattern is a sourced env file owned by the deploy user:
 export COOLIFY_BASE_URL="https://coolify.example.com" # replace this
 export COOLIFY_TOKEN="coolify-api-token" # replace this
 export COOLIFY_WEB_APP_UUID="00000000-0000-0000-0000-000000000000" # replace this
+export COOLIFY_PUBLIC_BASE_URL="https://app.example.com" # replace this
 ```
-
-This file can live at a path such as `/etc/coolify-ex/my-app.env` or `$HOME/.config/coolify-ex/my-app.env`.
 
 Load it before deploying:
 
@@ -74,90 +72,53 @@ set -a
 set +a
 ```
 
-This exports every variable from the env file into the current shell before Mix loads the manifest.
+## Daily Operator Flow
 
-Do not commit `.coolify_ex.exs` if it contains literal token values. Prefer `{:env, "NAME"}` tuples so the manifest can stay in version control without embedding secrets.
-
-## Typical Deploy Flow
-
-From the server checkout, the normal sequence is:
+For a routine deployment:
 
 ```bash
 git pull --ff-only
-mix coolify.deploy
-mix coolify.verify
+mix coolify.deploy --config .coolify_ex.exs
+mix coolify.logs --config .coolify_ex.exs --project web --latest --tail 200
+mix coolify.app_logs --config .coolify_ex.exs --project web --lines 200
 ```
 
-This updates the checkout, performs the deployment, and then reruns smoke checks on demand if you want a separate verification pass.
+If you only want the deploy task's built-in verification, stop after `mix coolify.deploy`. That task already waits for readiness and runs verification unless you pass `--skip-verify`.
 
-If you only want the deploy task's built-in verification, stop after `mix coolify.deploy`. That task already runs smoke checks unless you pass `--skip-verify`.
-
-When you need runtime logs for the currently running app rather than a specific deployment record, use:
+If you want to re-check the running app without triggering a new deployment, run:
 
 ```bash
-mix coolify.app_logs --project web --lines 200 --follow
+mix coolify.verify --config .coolify_ex.exs --project web
 ```
 
-This resolves the manifest project to its `app_uuid`, fetches the current application log tail, and then polls for newly observed lines.
+## Cron Example
 
-## Using `--no-push`
-
-Use `--no-push` when you already pushed the branch from another machine and only want this server to trigger Coolify:
-
-```bash
-# replace this project name if your manifest default is not the target you want
-mix coolify.deploy --project web --no-push
-```
-
-This skips the local `git push` step but still starts the Coolify deployment and verifies the selected project unless you also pass `--skip-verify`.
-
-`--no-push` does not bypass manifest loading, project selection, or verification. It only disables the Git push step.
-
-## Automating With Cron Or systemd
-
-Minimal cron entry:
-
-```bash
-SHELL=/bin/bash
-PATH=/usr/local/bin:/usr/bin:/bin
-# replace this env path, checkout path, and log path
+```cron
 0 * * * * . /etc/coolify-ex/my-app.env && cd /srv/coolify-ex/my-app && git pull --ff-only && mix coolify.deploy --config .coolify_ex.exs >> /var/log/coolify-ex-web.log 2>&1
 ```
 
-This cron job sources the env file in a non-interactive shell, updates the checkout, and records deploy output in a log file.
-
-Minimal oneshot unit:
+## systemd Example
 
 ```ini
 [Unit]
-Description=CoolifyEx deploy for my-app
+Description=Deploy my Coolify app with CoolifyEx
 After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=deploy # replace this
-WorkingDirectory=/srv/coolify-ex/my-app # replace this
-EnvironmentFile=/etc/coolify-ex/my-app.env # replace this
-# replace this command if you need a non-default project name
+WorkingDirectory=/srv/coolify-ex/my-app
+EnvironmentFile=/etc/coolify-ex/my-app.env
 ExecStart=/usr/bin/env bash -lc 'git pull --ff-only && mix coolify.deploy --config .coolify_ex.exs'
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-This unit runs the same update-and-deploy flow under a dedicated user with an explicit environment file.
+## Troubleshooting
 
-## What Can Go Wrong
-
-| Problem | What you see | How to fix |
-| --- | --- | --- |
-| The deploy user cannot authenticate to the Git remote. | `** (Mix) Coolify deploy failed: {:git_command_failed, code, output}` and the `output` text usually contains the SSH or remote error. | Make sure the deploy user has the right SSH key, agent setup, or HTTPS credentials for the repository remote. |
-| Env vars are present in your interactive shell but not in cron or systemd. | Manifest loading fails with messages such as `** (Mix) Coolify deploy failed: {:missing_required_value, :token}`. | Source an env file in cron and use `EnvironmentFile=` or equivalent for systemd. Do not rely on an interactive shell profile for non-interactive jobs. |
-| The Git remote is reachable, but the current branch does not match the manifest. | `** (Mix) Coolify deploy failed: {:branch_mismatch, "main", "release"}`. | Check out the branch named by `git_branch`, change the manifest, or use `--no-push` if the branch is already pushed. |
-| The bootstrap script uses a custom path whose parent directory does not exist. | `cp` fails before `mix coolify.setup` runs. | Create the directory first with `mkdir -p` before calling `./scripts/setup_remote.sh CUSTOM_PATH`. |
-| `mix coolify.setup` says the manifest is invalid but does not explain why. | `manifest: missing or invalid (...)` with no tuple details. | Run `mix coolify.deploy --config PATH --no-push --skip-verify` or `mix coolify.verify --config PATH --project NAME` to surface the exact loader error. |
-| You need current runtime app logs but only have a manifest project name. | You know the project key, but not a deployment UUID. | Run `mix coolify.app_logs --project NAME --lines 200` so `CoolifyEx` resolves the project's `app_uuid` and calls the application-logs endpoint directly. |
-
-## See Also
-
-- [guides/getting-started.md](getting-started.md) when you want the first deploy walkthrough before automating it on a server.
-- [guides/manifest.md](manifest.md) when you need the exact env tuple behavior and manifest discovery rules that matter on a remote host.
-- [guides/mix-tasks.md](mix-tasks.md) when you need the exact flags for `--no-push`, `--config`, runtime log polling, and verification behavior.
-- [guides/monorepos.md](monorepos.md) when the remote server needs to deploy multiple applications from one repository.
+| Problem | What to check |
+| --- | --- |
+| `mix coolify.setup` says the manifest is invalid. | Run `mix coolify.verify --config PATH --project NAME` or inspect the exact loader error from the task output. |
+| Deployment succeeds in Coolify but the task fails during readiness. | Inspect the app's boot path, the chosen readiness endpoint, and the configured readiness timeout. |
+| Runtime logs look fine but verification fails. | Compare the verification checks with the live routes the deployment should expose. |

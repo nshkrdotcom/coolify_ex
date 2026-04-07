@@ -47,7 +47,6 @@ defmodule CoolifyEx.DeployerTest do
       base_url: "https://coolify.example.com",
       token: "secret",
       default_project: "web",
-      default_app: "web",
       manifest_path: "/repo/coolify.exs",
       repo_root: "/repo",
       projects: %{
@@ -58,18 +57,14 @@ defmodule CoolifyEx.DeployerTest do
           git_remote: "origin",
           project_path: ".",
           public_base_url: "https://app.example.com",
-          smoke_checks: []
-        }
-      },
-      apps: %{
-        "web" => %App{
-          name: "web",
-          app_uuid: "app-123",
-          git_branch: "main",
-          git_remote: "origin",
-          project_path: ".",
-          public_base_url: "https://app.example.com",
-          smoke_checks: []
+          readiness_checks: [
+            %CoolifyEx.HTTPCheck{
+              name: "Health",
+              url: "https://app.example.com/healthz",
+              expected_status: 200
+            }
+          ],
+          verification_checks: []
         }
       }
     }

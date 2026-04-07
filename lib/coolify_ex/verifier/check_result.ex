@@ -1,12 +1,15 @@
 defmodule CoolifyEx.Verifier.CheckResult do
   @moduledoc """
-  Result of a single smoke check.
+  Result of a single readiness or verification check.
   """
 
-  @enforce_keys [:name, :url]
-  defstruct [:name, :url, :status, :reason, ok?: false]
+  @enforce_keys [:phase, :name, :url]
+  defstruct [:phase, :name, :url, :status, :reason, ok?: false]
+
+  @type phase :: :readiness | :verification
 
   @type t :: %__MODULE__{
+          phase: phase(),
           name: String.t(),
           url: String.t(),
           status: non_neg_integer() | nil,

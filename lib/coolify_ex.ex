@@ -14,7 +14,7 @@ defmodule CoolifyEx do
   - deploying with `CoolifyEx.Deployer.deploy/3`
   - listing deployments and resolving the latest deployment for an app
   - fetching runtime application logs with `CoolifyEx.ApplicationLogs.fetch/3`
-  - verifying a live app with `CoolifyEx.Verifier.verify/3`
+  - waiting for readiness and verifying a live app with `CoolifyEx.Verifier.verify/3`
   """
 
   alias CoolifyEx.ApplicationLogs

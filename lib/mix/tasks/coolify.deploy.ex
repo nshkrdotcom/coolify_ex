@@ -75,13 +75,43 @@ defmodule Mix.Tasks.Coolify.Deploy do
     else
       case Verifier.verify(config, target_name(opts)) do
         {:ok, result} ->
-          Mix.shell().info("Verification passed: #{result.passed}/#{result.total} checks")
+          Mix.shell().info("Readiness passed after #{result.readiness.attempts} attempt(s)")
 
-        {:error, result} ->
-          Mix.raise("Verification failed with #{result.failed} failing checks")
+          Mix.shell().info(
+            "Verification passed: #{result.verification.passed}/#{result.verification.total} checks"
+          )
+
+        {:error, result} when is_struct(result, CoolifyEx.Verifier.Result) ->
+          print_failed_checks(result)
+          Mix.raise(failure_message(result))
+
+        {:error, reason} ->
+          Mix.raise("Verification failed: #{inspect(reason)}")
       end
     end
   end
 
   defp target_name(opts), do: Keyword.get(opts, :project) || Keyword.get(opts, :app)
+
+  defp print_failed_checks(result) do
+    (result.readiness.checks ++ result.verification.checks)
+    |> Enum.each(fn check ->
+      if not check.ok? do
+        Mix.shell().error("#{check.phase} #{check.name}: #{check.reason}")
+      end
+    end)
+  end
+
+  defp failure_message(result) do
+    cond do
+      result.readiness.failed > 0 ->
+        "Verification failed during readiness with #{result.readiness.failed} failing checks"
+
+      result.verification.failed > 0 ->
+        "Verification failed with #{result.verification.failed} failing checks"
+
+      true ->
+        "Verification failed"
+    end
+  end
 end

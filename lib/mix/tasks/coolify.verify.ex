@@ -1,14 +1,14 @@
 defmodule Mix.Tasks.Coolify.Verify do
   use Mix.Task
 
-  @shortdoc "Runs smoke checks against a configured Coolify app"
+  @shortdoc "Waits for readiness and runs verification checks against a configured Coolify app"
 
   alias CoolifyEx.Config
   alias CoolifyEx.MixTaskSupport
   alias CoolifyEx.Verifier
 
   @moduledoc """
-  Runs smoke checks defined in the deployment manifest.
+  Waits for readiness and then runs verification checks defined in the deployment manifest.
 
       mix coolify.verify
       mix coolify.verify --project web
@@ -33,22 +33,51 @@ defmodule Mix.Tasks.Coolify.Verify do
   defp run_verification(config, app_name) do
     case Verifier.verify(config, app_name) do
       {:ok, result} ->
-        Mix.shell().info("All #{result.total} checks passed for #{result.app}")
+        print_success(result)
 
-      {:error, %{checks: checks, app: app}} = _result ->
-        print_failed_checks(checks)
-        Mix.raise("Verification failed for #{app}")
+      {:error, result} when is_struct(result, CoolifyEx.Verifier.Result) ->
+        print_failed_checks(result)
+        Mix.raise(failure_message(result))
 
       {:error, reason} ->
         Mix.raise("Could not verify app: #{inspect(reason)}")
     end
   end
 
-  defp print_failed_checks(checks) do
-    Enum.each(checks, fn check ->
+  defp print_success(result) do
+    Mix.shell().info(
+      "Readiness passed for #{result.app} after #{result.readiness.attempts} attempt(s)"
+    )
+
+    Mix.shell().info(
+      "Verification passed: #{result.verification.passed}/#{result.verification.total} checks"
+    )
+  end
+
+  defp print_failed_checks(result) do
+    result
+    |> failed_checks()
+    |> Enum.each(fn check ->
       if not check.ok? do
-        Mix.shell().error("#{check.name}: #{check.reason}")
+        Mix.shell().error("#{check.phase} #{check.name}: #{check.reason}")
       end
     end)
+  end
+
+  defp failed_checks(result) do
+    result.readiness.checks ++ result.verification.checks
+  end
+
+  defp failure_message(result) do
+    cond do
+      result.readiness.failed > 0 ->
+        "Verification failed during readiness for #{result.app}"
+
+      result.verification.failed > 0 ->
+        "Verification failed for #{result.app}"
+
+      true ->
+        "Verification failed for #{result.app}"
+    end
   end
 end

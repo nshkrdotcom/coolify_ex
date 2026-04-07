@@ -16,20 +16,18 @@ defmodule CoolifyEx.Config do
   """
 
   alias CoolifyEx.Config.App
-  alias CoolifyEx.SmokeCheck
+  alias CoolifyEx.HTTPCheck
 
   @default_manifest_names [".coolify_ex.exs", ".coolify.exs", "coolify.exs"]
 
-  @enforce_keys [:base_url, :token, :apps]
+  @enforce_keys [:base_url, :token, :projects]
   defstruct [
     :base_url,
     :token,
     :default_project,
-    :default_app,
     :manifest_path,
     :repo_root,
-    projects: %{},
-    apps: %{}
+    projects: %{}
   ]
 
   @type env_source :: %{optional(String.t()) => String.t()}
@@ -38,9 +36,7 @@ defmodule CoolifyEx.Config do
           base_url: String.t(),
           token: String.t(),
           default_project: String.t() | nil,
-          default_app: String.t() | nil,
           projects: %{optional(String.t()) => App.t()},
-          apps: %{optional(String.t()) => App.t()},
           manifest_path: Path.t(),
           repo_root: Path.t()
         }
@@ -137,7 +133,7 @@ defmodule CoolifyEx.Config do
          {:ok, projects} <- normalize_projects(project_entries(manifest), repo_root, env) do
       default_project =
         manifest
-        |> Map.get(:default_project, Map.get(manifest, :default_app))
+        |> Map.get(:default_project)
         |> normalize_optional_name()
 
       {:ok,
@@ -145,9 +141,7 @@ defmodule CoolifyEx.Config do
          base_url: base_url,
          token: token,
          default_project: default_project,
-         default_app: default_project,
          projects: projects,
-         apps: projects,
          manifest_path: manifest_path,
          repo_root: repo_root
        }}
@@ -179,29 +173,86 @@ defmodule CoolifyEx.Config do
         |> Map.get(:public_base_url)
         |> resolve_value(env)
 
-      smoke_checks =
-        attrs
-        |> Map.get(:smoke_checks, [])
-        |> Enum.map(&normalize_smoke_check(&1, public_base_url, env))
-
-      {:ok,
-       %App{
-         name: project_name,
-         app_uuid: app_uuid,
-         git_branch: Map.get(attrs, :git_branch, "main"),
-         git_remote: Map.get(attrs, :git_remote, "origin"),
-         project_path: project_path,
-         public_base_url: public_base_url,
-         smoke_checks: smoke_checks
-       }}
+      with {:ok, readiness} <- normalize_readiness(project_name, attrs, public_base_url, env),
+           {:ok, verification_checks} <-
+             normalize_verification(project_name, attrs, public_base_url, env) do
+        {:ok,
+         %App{
+           name: project_name,
+           app_uuid: app_uuid,
+           git_branch: Map.get(attrs, :git_branch, "main"),
+           git_remote: Map.get(attrs, :git_remote, "origin"),
+           project_path: project_path,
+           public_base_url: public_base_url,
+           readiness_initial_delay_ms: readiness.initial_delay_ms,
+           readiness_poll_interval_ms: readiness.poll_interval_ms,
+           readiness_timeout_ms: readiness.timeout_ms,
+           readiness_checks: readiness.checks,
+           verification_checks: verification_checks
+         }}
+      end
     end
   end
 
-  defp normalize_smoke_check(raw_check, public_base_url, env) do
+  defp normalize_readiness(project_name, attrs, public_base_url, env) do
+    case Map.get(attrs, :readiness) do
+      nil ->
+        {:error, {:missing_required_value, {:projects, project_name, :readiness}}}
+
+      readiness ->
+        readiness = normalize_container(readiness)
+
+        with {:ok, checks} <-
+               normalize_checks(Map.get(readiness, :checks, []), public_base_url, env),
+             :ok <- validate_non_empty_checks(checks, {:projects, project_name, :readiness}),
+             {:ok, initial_delay_ms} <-
+               normalize_non_negative_integer(
+                 Map.get(readiness, :initial_delay_ms, 0),
+                 {:projects, project_name, :readiness_initial_delay_ms}
+               ),
+             {:ok, poll_interval_ms} <-
+               normalize_positive_integer(
+                 Map.get(readiness, :poll_interval_ms, 2_000),
+                 {:projects, project_name, :readiness_poll_interval_ms}
+               ),
+             {:ok, timeout_ms} <-
+               normalize_positive_integer(
+                 Map.get(readiness, :timeout_ms, 120_000),
+                 {:projects, project_name, :readiness_timeout_ms}
+               ) do
+          {:ok,
+           %{
+             initial_delay_ms: initial_delay_ms,
+             poll_interval_ms: poll_interval_ms,
+             timeout_ms: timeout_ms,
+             checks: checks
+           }}
+        end
+    end
+  end
+
+  defp normalize_verification(_project_name, attrs, public_base_url, env) do
+    checks =
+      attrs
+      |> Map.get(:verification, %{})
+      |> normalize_optional_container()
+      |> Map.get(:checks, [])
+
+    normalize_checks(checks, public_base_url, env)
+  end
+
+  defp normalize_checks(checks, public_base_url, env) when is_list(checks) do
+    {:ok, Enum.map(checks, &normalize_check(&1, public_base_url, env))}
+  end
+
+  defp normalize_checks(_checks, _public_base_url, _env),
+    do: {:error, {:invalid_checks, :expected_list}}
+
+  defp normalize_check(raw_check, public_base_url, env) do
     check = normalize_container(raw_check)
     url = Map.fetch!(check, :url) |> resolve_value(env)
 
-    %SmokeCheck{
+    %HTTPCheck{
       name: Map.fetch!(check, :name),
       url: normalize_check_url(url, public_base_url),
       method: normalize_method(Map.get(check, :method, :get)),
@@ -223,14 +274,14 @@ defmodule CoolifyEx.Config do
   defp normalize_method("head"), do: :head
 
   defp normalize_method(other),
-    do: raise(ArgumentError, "unsupported smoke check method: #{inspect(other)}")
+    do: raise(ArgumentError, "unsupported HTTP check method: #{inspect(other)}")
 
   defp normalize_project_path(path, repo_root) do
     Path.relative_to(Path.expand(path, repo_root), repo_root)
   end
 
   defp project_entries(manifest) do
-    Map.get(manifest, :projects, Map.get(manifest, :apps))
+    Map.get(manifest, :projects)
   end
 
   defp validate_project_path(project_path, repo_root, app_name) do
@@ -259,8 +310,23 @@ defmodule CoolifyEx.Config do
   defp resolve_value({:env, name}, env) when is_binary(name), do: Map.get(env, name)
   defp resolve_value(value, _env), do: value
 
+  defp validate_non_empty_checks([], key), do: {:error, {:missing_required_value, key}}
+  defp validate_non_empty_checks(_checks, _key), do: :ok
+
+  defp normalize_non_negative_integer(value, _key) when is_integer(value) and value >= 0,
+    do: {:ok, value}
+
+  defp normalize_non_negative_integer(_value, key), do: {:error, {:invalid_integer, key}}
+
+  defp normalize_positive_integer(value, _key) when is_integer(value) and value > 0,
+    do: {:ok, value}
+
+  defp normalize_positive_integer(_value, key), do: {:error, {:invalid_integer, key}}
+
   defp normalize_container(value) when is_map(value), do: value
   defp normalize_container(value) when is_list(value), do: Map.new(value)
+  defp normalize_optional_container(nil), do: %{}
+  defp normalize_optional_container(value), do: normalize_container(value)
 
   defp normalize_name(value) when is_atom(value), do: Atom.to_string(value)
   defp normalize_name(value) when is_binary(value), do: value

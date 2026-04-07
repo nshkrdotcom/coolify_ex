@@ -50,7 +50,7 @@ defmodule Mix.Tasks.Coolify.Setup do
     Mix.shell().info("Next steps:")
 
     Mix.shell().info(
-      "1. Edit .coolify_ex.exs with your project UUIDs, branches, and smoke checks."
+      "1. Edit .coolify_ex.exs with your project UUIDs, branches, readiness checks, and verification checks."
     )
 
     Mix.shell().info("2. Export COOLIFY_BASE_URL and COOLIFY_TOKEN on this server.")

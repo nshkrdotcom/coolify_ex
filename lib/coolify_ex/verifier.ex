@@ -1,36 +1,85 @@
 defmodule CoolifyEx.Verifier do
   @moduledoc """
-  Runs live-app smoke checks defined in the local manifest.
+  Waits for a deployed app to become ready, then runs post-ready verification checks.
   """
 
   alias CoolifyEx.Config
   alias CoolifyEx.Verifier.CheckResult
+  alias CoolifyEx.Verifier.PhaseResult
   alias CoolifyEx.Verifier.Result
 
   @spec verify(Config.t(), String.t() | atom(), keyword()) ::
           {:ok, Result.t()} | {:error, Result.t() | term()}
   def verify(%Config{} = config, app_name, opts \\ []) do
     request = Keyword.get(opts, :request, &default_request/2)
+    sleep_fun = Keyword.get(opts, :sleep, &:timer.sleep/1)
+    now_ms = Keyword.get(opts, :now_ms, fn -> System.monotonic_time(:millisecond) end)
 
-    with {:ok, app} <- Config.fetch_app(config, app_name) do
-      checks = Enum.map(app.smoke_checks, &run_check(&1, request))
-      result = build_result(app.name, checks)
+    with {:ok, app} <- Config.fetch_app(config, app_name),
+         {:ok, readiness} <- await_readiness(app, request, sleep_fun, now_ms) do
+      verification = run_phase(:verification, app.verification_checks, request)
+      result = %Result{app: app.name, readiness: readiness, verification: verification}
 
-      if result.failed == 0 do
+      if verification.failed == 0 do
         {:ok, result}
       else
         {:error, result}
       end
+    else
+      {:error, %PhaseResult{} = readiness} ->
+        {:error,
+         %Result{
+           app: normalize_app_name(config, app_name),
+           readiness: readiness,
+           verification: empty_phase(:verification)
+         }}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
-  defp run_check(check, request) do
+  defp await_readiness(app, request, sleep_fun, now_ms) do
+    started_at = now_ms.()
+
+    if app.readiness_initial_delay_ms > 0 do
+      sleep_fun.(app.readiness_initial_delay_ms)
+    end
+
+    do_await_readiness(app, request, sleep_fun, now_ms, started_at, 1)
+  end
+
+  defp do_await_readiness(app, request, sleep_fun, now_ms, started_at, attempts) do
+    phase = run_phase(:readiness, app.readiness_checks, request)
+    duration_ms = max(now_ms.() - started_at, 0)
+    phase = %{phase | attempts: attempts, duration_ms: duration_ms}
+
+    cond do
+      phase.failed == 0 ->
+        {:ok, phase}
+
+      duration_ms >= app.readiness_timeout_ms ->
+        {:error, phase}
+
+      true ->
+        sleep_fun.(app.readiness_poll_interval_ms)
+        do_await_readiness(app, request, sleep_fun, now_ms, started_at, attempts + 1)
+    end
+  end
+
+  defp run_phase(name, checks, request) do
+    checks = Enum.map(checks, &run_check(name, &1, request))
+    build_phase(name, checks)
+  end
+
+  defp run_check(phase, check, request) do
     case request.(check.method, check.url) do
       {:ok, %{status: status, body: body}} ->
-        evaluate_response(check, status, body)
+        evaluate_response(phase, check, status, body)
 
       {:error, reason} ->
         %CheckResult{
+          phase: phase,
           name: check.name,
           url: check.url,
           reason: format_reason(reason),
@@ -39,12 +88,13 @@ defmodule CoolifyEx.Verifier do
     end
   end
 
-  defp evaluate_response(check, status, body) do
+  defp evaluate_response(phase, check, status, body) do
     body = body || ""
 
     cond do
       status != check.expected_status ->
         %CheckResult{
+          phase: phase,
           name: check.name,
           url: check.url,
           status: status,
@@ -55,6 +105,7 @@ defmodule CoolifyEx.Verifier do
       is_binary(check.expected_body_contains) and
           not String.contains?(body, check.expected_body_contains) ->
         %CheckResult{
+          phase: phase,
           name: check.name,
           url: check.url,
           status: status,
@@ -63,21 +114,42 @@ defmodule CoolifyEx.Verifier do
         }
 
       true ->
-        %CheckResult{name: check.name, url: check.url, status: status, ok?: true}
+        %CheckResult{phase: phase, name: check.name, url: check.url, status: status, ok?: true}
     end
   end
 
-  defp build_result(app_name, checks) do
+  defp build_phase(name, checks) do
     failed = Enum.count(checks, &(!&1.ok?))
     total = length(checks)
 
-    %Result{
-      app: app_name,
+    %PhaseResult{
+      name: name,
+      attempts: 1,
+      duration_ms: 0,
       total: total,
       passed: total - failed,
       failed: failed,
       checks: checks
     }
+  end
+
+  defp empty_phase(name) do
+    %PhaseResult{
+      name: name,
+      attempts: 0,
+      duration_ms: 0,
+      total: 0,
+      passed: 0,
+      failed: 0,
+      checks: []
+    }
+  end
+
+  defp normalize_app_name(config, app_name) do
+    case Config.fetch_app(config, app_name) do
+      {:ok, app} -> app.name
+      {:error, _reason} -> to_string(app_name)
+    end
   end
 
   defp default_request(method, url) do

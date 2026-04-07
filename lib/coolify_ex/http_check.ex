@@ -1,6 +1,6 @@
-defmodule CoolifyEx.SmokeCheck do
+defmodule CoolifyEx.HTTPCheck do
   @moduledoc """
-  A single live-app verification check.
+  A single HTTP readiness or verification check.
   """
 
   @enforce_keys [:name, :url]
